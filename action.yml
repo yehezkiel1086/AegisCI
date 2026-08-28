@@ -139,7 +139,7 @@ runs:
         if ! command -v gitleaks &> /dev/null; then
           echo "Installing Gitleaks..."
           GITLEAKS_VERSION="8.18.4"
-          curl -sSL -o /tmp/gitleaks.tar.gz "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          curl -sSL "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz" -o /tmp/gitleaks.tar.gz
           sudo tar -xzf /tmp/gitleaks.tar.gz -C /usr/local/bin gitleaks || true
           sudo chmod +x /usr/local/bin/gitleaks || true
           rm -f /tmp/gitleaks.tar.gz
@@ -160,11 +160,8 @@ runs:
       run: |
         if ! command -v trivy &> /dev/null; then
           echo "Installing Trivy..."
-          TRIVY_VERSION="0.51.0"
-          curl -sSL -o /tmp/trivy.tar.gz "https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}/trivy_${TRIVY_VERSION}_Linux-64bit.tar.gz"
-          sudo tar -xzf /tmp/trivy.tar.gz -C /usr/local/bin trivy || true
+          curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sudo sh -s -- -b /usr/local/bin v0.51.0 || true
           sudo chmod +x /usr/local/bin/trivy || true
-          rm -f /tmp/trivy.tar.gz
         fi
 
     - name: Install Checkov
