@@ -1,0 +1,98 @@
+name: 'AegisCI Security Orchestrator'
+description: 'All-in-One DevSecOps Scanner & Security Orchestrator for GitHub Actions (SAST, Secrets, SCA, IaC).'
+author: 'AegisCI'
+branding:
+  icon: 'shield'
+  color: 'purple'
+
+inputs:
+  mode:
+    description: 'Execution mode (auto, pr-check, deep-scan)'
+    required: false
+    default: 'auto'
+  fail-on-severity:
+    description: 'Fail pipeline on findings: NONE, LOW, MEDIUM, HIGH, CRITICAL'
+    required: false
+    default: 'HIGH'
+  sast:
+    description: 'Enable Static Application Security Testing (Semgrep)'
+    required: false
+    default: 'true'
+  secrets:
+    description: 'Enable Secret Detection (Gitleaks)'
+    required: false
+    default: 'true'
+  target:
+    description: 'Directory or repository root to scan'
+    required: false
+    default: '.'
+  output:
+    description: 'Destination path for unified SARIF report'
+    required: false
+    default: 'results.sarif'
+  policy-file:
+    description: 'Path to custom .aegisci.yml policy rules'
+    required: false
+    default: '.aegisci.yml'
+  upload-sarif:
+    description: 'Automatically upload unified SARIF report to GitHub Code Scanning'
+    required: false
+    default: 'true'
+
+outputs:
+  sarif-path:
+    description: 'Path to the generated unified SARIF report'
+    value: ${{ inputs.output }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: '1.26'
+        check-latest: true
+
+    - name: Install Gitleaks
+      if: ${{ inputs.secrets == 'true' }}
+      shell: bash
+      run: |
+        if ! command -v gitleaks &> /dev/null; then
+          echo "Installing Gitleaks..."
+          GITLEAKS_VERSION="8.18.4"
+          curl -sSL "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz" | tar -xz -C /usr/local/bin gitleaks || true
+        fi
+
+    - name: Install Semgrep
+      if: ${{ inputs.sast == 'true' }}
+      shell: bash
+      run: |
+        if ! command -v semgrep &> /dev/null; then
+          echo "Installing Semgrep..."
+          python3 -m pip install --upgrade semgrep || pip install --upgrade semgrep || true
+        fi
+
+    - name: Build AegisCI Orchestrator
+      shell: bash
+      run: |
+        cd ${{ github.action_path }}
+        go build -o /tmp/aegisci ./cmd/aegisci
+
+    - name: Run AegisCI Security Scan
+      shell: bash
+      run: |
+        /tmp/aegisci \
+          --target="${{ inputs.target }}" \
+          --output="${{ inputs.output }}" \
+          --mode="${{ inputs.mode }}" \
+          --fail-on-severity="${{ inputs.fail-on-severity }}" \
+          --sast="${{ inputs.sast }}" \
+          --secrets="${{ inputs.secrets }}" \
+          --policy-file="${{ inputs.policy-file }}"
+
+    - name: Upload Unified SARIF to GitHub Code Scanning
+      if: ${{ inputs.upload-sarif == 'true' && (always() || success() || failure()) }}
+      uses: github/codeql-action/upload-sarif@v3
+      with:
+        sarif_file: ${{ inputs.output }}
+        category: 'aegisci'
