@@ -4,21 +4,24 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/owenrumney/go-sarif/v2/sarif"
 	"github.com/yehezkiel1086/AegisCI/pkg/config"
+	"github.com/yehezkiel1086/AegisCI/pkg/policy"
 )
 
 // Summary contains aggregate statistics of scan findings.
 type Summary struct {
-	Total    int            `json:"total"`
-	Critical int            `json:"critical"`
-	High     int            `json:"high"`
-	Medium   int            `json:"medium"`
-	Low      int            `json:"low"`
-	Note     int            `json:"note"`
-	ByEngine map[string]int `json:"by_engine"`
-	Findings []Finding      `json:"findings"`
+	Total      int            `json:"total"`
+	Critical   int            `json:"critical"`
+	High       int            `json:"high"`
+	Medium     int            `json:"medium"`
+	Low        int            `json:"low"`
+	Note       int            `json:"note"`
+	Suppressed int            `json:"suppressed"`
+	ByEngine   map[string]int `json:"by_engine"`
+	Findings   []Finding      `json:"findings"`
 }
 
 // Finding represents a single unified finding.
@@ -33,7 +36,8 @@ type Finding struct {
 
 // Aggregator merges and processes SARIF reports from multiple scanner engines.
 type Aggregator struct {
-	masterReport *sarif.Report
+	masterReport    *sarif.Report
+	suppressedCount int
 }
 
 // New creates a new Aggregator initialized with an empty SARIF v2.1.0 document.
@@ -116,15 +120,31 @@ func generateResultDeduplicationKey(res *sarif.Result) string {
 }
 
 // ApplyPolicy filters out findings according to policy exceptions / ignore rules.
-func (a *Aggregator) ApplyPolicy(policy *config.PolicyConfig) {
-	if policy == nil || len(policy.Ignore) == 0 {
+func (a *Aggregator) ApplyPolicy(p *policy.Policy) {
+	if p == nil || len(p.Ignore) == 0 {
 		return
 	}
 
+	now := time.Now()
 	for _, run := range a.masterReport.Runs {
 		var filteredResults []*sarif.Result
 		for _, result := range run.Results {
-			if !isIgnored(result, policy.Ignore) {
+			ruleID := ""
+			if result.RuleID != nil {
+				ruleID = *result.RuleID
+			}
+
+			fileURI := ""
+			if len(result.Locations) > 0 && result.Locations[0].PhysicalLocation != nil {
+				phys := result.Locations[0].PhysicalLocation
+				if phys.ArtifactLocation != nil && phys.ArtifactLocation.URI != nil {
+					fileURI = *phys.ArtifactLocation.URI
+				}
+			}
+
+			if ignored, _ := p.ShouldIgnore(ruleID, fileURI, now); ignored {
+				a.suppressedCount++
+			} else {
 				filteredResults = append(filteredResults, result)
 			}
 		}
@@ -132,37 +152,12 @@ func (a *Aggregator) ApplyPolicy(policy *config.PolicyConfig) {
 	}
 }
 
-func isIgnored(res *sarif.Result, ignores []config.PolicyIgnore) bool {
-	ruleID := ""
-	if res.RuleID != nil {
-		ruleID = *res.RuleID
-	}
-
-	fileURI := ""
-	if len(res.Locations) > 0 && res.Locations[0].PhysicalLocation != nil {
-		phys := res.Locations[0].PhysicalLocation
-		if phys.ArtifactLocation != nil && phys.ArtifactLocation.URI != nil {
-			fileURI = *phys.ArtifactLocation.URI
-		}
-	}
-
-	for _, ig := range ignores {
-		if ig.ID != "" && ig.ID != ruleID {
-			continue
-		}
-		if ig.Path != "" && !strings.Contains(fileURI, ig.Path) {
-			continue
-		}
-		return true
-	}
-	return false
-}
-
 // ComputeSummary calculates statistics across all runs and findings.
 func (a *Aggregator) ComputeSummary() *Summary {
 	summary := &Summary{
-		ByEngine: make(map[string]int),
-		Findings: make([]Finding, 0),
+		Suppressed: a.suppressedCount,
+		ByEngine:   make(map[string]int),
+		Findings:   make([]Finding, 0),
 	}
 
 	for _, run := range a.masterReport.Runs {
@@ -202,7 +197,6 @@ func (a *Aggregator) ComputeSummary() *Summary {
 				level = *res.Level
 			}
 
-			// Map SARIF level or properties to severity
 			sev := config.MapSARIFLevelToSeverity(level)
 			if res.Properties != nil {
 				if propSev, ok := res.Properties["security-severity"].(string); ok && propSev != "" {
@@ -237,20 +231,34 @@ func (a *Aggregator) ComputeSummary() *Summary {
 	return summary
 }
 
-// ShouldFail determines if any finding in the summary exceeds or meets the threshold.
-func (a *Aggregator) ShouldFail(failOnSeverity string) bool {
+// EvaluateGate determines whether the build should fail based on severity threshold and policy settings.
+func (a *Aggregator) EvaluateGate(p *policy.Policy, failOnSeverity string) (bool, string) {
 	thresholdRank := config.SeverityRank(failOnSeverity)
-	if thresholdRank == 0 {
-		return false // NONE or OFF never fails
-	}
-
 	summary := a.ComputeSummary()
-	for _, f := range summary.Findings {
-		if config.SeverityRank(f.Severity) >= thresholdRank {
-			return true
+
+	// 1. Check max tolerances from policy settings if defined
+	if p != nil {
+		if p.Settings.MaxCritical > 0 && summary.Critical > p.Settings.MaxCritical {
+			return true, fmt.Sprintf("Critical findings (%d) exceeded policy max tolerance of %d", summary.Critical, p.Settings.MaxCritical)
+		}
+		if p.Settings.MaxHigh > 0 && summary.High > p.Settings.MaxHigh {
+			return true, fmt.Sprintf("High findings (%d) exceeded policy max tolerance of %d", summary.High, p.Settings.MaxHigh)
+		}
+		if p.Settings.MaxMedium > 0 && summary.Medium > p.Settings.MaxMedium {
+			return true, fmt.Sprintf("Medium findings (%d) exceeded policy max tolerance of %d", summary.Medium, p.Settings.MaxMedium)
 		}
 	}
-	return false
+
+	// 2. Check general fail-on-severity threshold
+	if thresholdRank > 0 {
+		for _, f := range summary.Findings {
+			if config.SeverityRank(f.Severity) >= thresholdRank {
+				return true, fmt.Sprintf("Finding '%s' (%s) meets or exceeds fail-on-severity threshold '%s'", f.RuleID, f.Severity, failOnSeverity)
+			}
+		}
+	}
+
+	return false, ""
 }
 
 // SaveCombined writes the merged SARIF report to the target destination.
