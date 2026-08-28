@@ -15,9 +15,11 @@ import (
 	"github.com/yehezkiel1086/AegisCI/pkg/config"
 	"github.com/yehezkiel1086/AegisCI/pkg/detector"
 	"github.com/yehezkiel1086/AegisCI/pkg/engine"
+	"github.com/yehezkiel1086/AegisCI/pkg/policy"
+	"github.com/yehezkiel1086/AegisCI/pkg/router"
 )
 
-const version = "1.0.0"
+const version = "2.0.0"
 
 var (
 	banner = `
@@ -56,6 +58,11 @@ func main() {
 	rootCmd.Flags().StringVarP(&cfg.FailOnSeverity, "fail-on-severity", "f", cfg.FailOnSeverity, "Fail pipeline on severity (NONE, LOW, MEDIUM, HIGH, CRITICAL)")
 	rootCmd.Flags().BoolVar(&cfg.EnableSAST, "sast", cfg.EnableSAST, "Enable SAST engine (Semgrep)")
 	rootCmd.Flags().BoolVar(&cfg.EnableSecrets, "secrets", cfg.EnableSecrets, "Enable Secrets engine (Gitleaks)")
+	rootCmd.Flags().BoolVar(&cfg.EnableSCA, "sca", cfg.EnableSCA, "Enable SCA engine (Trivy)")
+	rootCmd.Flags().BoolVar(&cfg.EnableIaC, "iac", cfg.EnableIaC, "Enable IaC & Container engine (Checkov)")
+	rootCmd.Flags().BoolVar(&cfg.GenerateSBOM, "sbom", cfg.GenerateSBOM, "Generate Software Bill of Materials (SBOM)")
+	rootCmd.Flags().StringVar(&cfg.SBOMFormat, "sbom-format", cfg.SBOMFormat, "SBOM format: cyclonedx-json, spdx-json")
+	rootCmd.Flags().StringVar(&cfg.SBOMOutput, "sbom-output", cfg.SBOMOutput, "Output path for SBOM artifact")
 	rootCmd.Flags().StringVar(&cfg.PolicyFile, "policy-file", cfg.PolicyFile, "Path to .aegisci.yml policy configuration")
 	rootCmd.Flags().BoolVarP(&cfg.Verbose, "verbose", "v", cfg.Verbose, "Enable verbose output")
 
@@ -68,8 +75,8 @@ func main() {
 func runScan(cfg *config.Config) error {
 	// Print Banner
 	cyanBold.Print(banner)
-	whiteBold.Printf(" AegisCI Security Orchestrator v%s\n", version)
-	gray.Println(" ==========================================================")
+	whiteBold.Printf(" AegisCI Security Orchestrator v%s (Supply Chain, IaC & Policy Edition)\n", version)
+	gray.Println(" ==========================================================================")
 	fmt.Println()
 
 	// Normalize and validate fail-on-severity
@@ -85,8 +92,14 @@ func runScan(cfg *config.Config) error {
 
 	startTime := time.Now()
 
-	// 1. Stack Detection
-	whiteBold.Println("🔍 [1/4] Detecting Repository Stack...")
+	// 1. Resolve Execution Mode & Pipeline Strategy
+	plan := router.ResolvePlan(cfg)
+	whiteBold.Printf("⚡ [1/5] Smart Mode Routing (Mode: %s)\n", color.CyanString(plan.EffectiveMode))
+	gray.Printf("  • %s\n", plan.Reason)
+	fmt.Println()
+
+	// 2. Stack Detection
+	whiteBold.Println("🔍 [2/5] Inspecting Repository Stack...")
 	stack, err := detector.Detect(cfg.TargetDir)
 	if err != nil {
 		gray.Printf("  Warning: could not inspect stack: %v\n", err)
@@ -105,37 +118,59 @@ func runScan(cfg *config.Config) error {
 	}
 	fmt.Println()
 
-	// 2. Scanner Orchestration
-	whiteBold.Println("⚡ [2/4] Initializing Security Engines...")
+	// 3. Scanner Orchestration
+	whiteBold.Println("🛠️  [3/5] Initializing Security Engines...")
 	var activeScanners []engine.Scanner
+	var sbomEngine *engine.TrivyScanner
 
-	if cfg.EnableSecrets {
+	if plan.EnableSecrets {
 		gitleaks := engine.NewGitleaksScanner()
 		if gitleaks.IsAvailable() {
-			greenBold.Printf("  [✓] Gitleaks (Secrets)  -> READY\n")
+			greenBold.Printf("  [✓] Gitleaks (Secrets Detection)    -> READY\n")
 		} else {
-			yellowBold.Printf("  [!] Gitleaks (Secrets)  -> NOT INSTALLED in PATH\n")
+			yellowBold.Printf("  [!] Gitleaks (Secrets Detection)    -> NOT INSTALLED in PATH\n")
 		}
 		activeScanners = append(activeScanners, gitleaks)
 	}
 
-	if cfg.EnableSAST {
+	if plan.EnableSAST {
 		semgrep := engine.NewSemgrepScanner()
 		if semgrep.IsAvailable() {
-			greenBold.Printf("  [✓] Semgrep (SAST)      -> READY\n")
+			greenBold.Printf("  [✓] Semgrep  (SAST Static Code)     -> READY\n")
 		} else {
-			yellowBold.Printf("  [!] Semgrep (SAST)      -> NOT INSTALLED in PATH\n")
+			yellowBold.Printf("  [!] Semgrep  (SAST Static Code)     -> NOT INSTALLED in PATH\n")
 		}
 		activeScanners = append(activeScanners, semgrep)
 	}
 
+	if plan.EnableSCA {
+		trivy := engine.NewTrivyScanner()
+		sbomEngine = trivy
+		if trivy.IsAvailable() {
+			greenBold.Printf("  [✓] Trivy    (SCA & Dependencies)   -> READY\n")
+		} else {
+			yellowBold.Printf("  [!] Trivy    (SCA & Dependencies)   -> NOT INSTALLED in PATH\n")
+		}
+		activeScanners = append(activeScanners, trivy)
+	}
+
+	if plan.EnableIaC {
+		checkov := engine.NewCheckovScanner()
+		if checkov.IsAvailable() {
+			greenBold.Printf("  [✓] Checkov  (IaC & Containers)     -> READY\n")
+		} else {
+			yellowBold.Printf("  [!] Checkov  (IaC & Containers)     -> NOT INSTALLED in PATH\n")
+		}
+		activeScanners = append(activeScanners, checkov)
+	}
+
 	if len(activeScanners) == 0 {
-		return fmt.Errorf("no scanners enabled or available")
+		return fmt.Errorf("no scanners enabled or available in current configuration")
 	}
 	fmt.Println()
 
-	// 3. Execution
-	whiteBold.Printf("🚀 [3/4] Running Security Audits (Mode: %s)...\n", color.CyanString(cfg.Mode))
+	// 4. Execution
+	whiteBold.Println("🚀 [4/5] Executing Parallel Security Scanners...")
 	orchestrator := engine.NewOrchestrator(activeScanners...)
 	results := orchestrator.Run(ctx, cfg.TargetDir)
 
@@ -146,7 +181,7 @@ func runScan(cfg *config.Config) error {
 
 	for _, res := range results {
 		if res.Error != nil {
-			redBold.Printf("  ✗ %s (%s): failed (%s) - %v\n", res.ScannerName, res.Category, res.Duration.Round(time.Millisecond), res.Error)
+			redBold.Printf("  ✗ %-8s (%-20s): failed (%s) - %v\n", res.ScannerName, res.Category, res.Duration.Round(time.Millisecond), res.Error)
 		} else {
 			findingCount := 0
 			if res.Report != nil {
@@ -155,22 +190,33 @@ func runScan(cfg *config.Config) error {
 				}
 				agg.AddReport(res.Report)
 			}
-			greenBold.Printf("  ✓ %s (%s): completed in %s (findings: %d)\n",
+			greenBold.Printf("  ✓ %-8s (%-20s): completed in %-6s (findings: %d)\n",
 				res.ScannerName, res.Category, res.Duration.Round(time.Millisecond), findingCount)
+		}
+	}
+
+	// Optional SBOM Generation
+	if plan.GenerateSBOM && sbomEngine != nil && sbomEngine.IsAvailable() {
+		fmt.Println()
+		whiteBold.Printf("📦 Generating Software Bill of Materials (%s)...\n", color.CyanString(cfg.SBOMFormat))
+		if err := sbomEngine.GenerateSBOM(ctx, cfg.TargetDir, cfg.SBOMFormat, cfg.SBOMOutput); err != nil {
+			redBold.Printf("  ✗ SBOM generation failed: %v\n", err)
+		} else {
+			greenBold.Printf("  ✓ SBOM artifact successfully saved to: %s\n", color.WhiteString(cfg.SBOMOutput))
 		}
 	}
 	fmt.Println()
 
-	// 4. Aggregation & Policy Application
-	whiteBold.Println("🛡️  [4/4] Aggregating & Deduplicating SARIF Findings...")
+	// 5. Aggregation, Deduplication & Policy-as-Code Evaluation
+	whiteBold.Println("🛡️  [5/5] Aggregating Findings & Evaluating Policy-as-Code...")
 	agg.Deduplicate()
 
-	policy, polErr := config.LoadPolicyFile(cfg.PolicyFile)
+	pol, polErr := policy.LoadPolicy(cfg.PolicyFile)
 	if polErr != nil {
 		gray.Printf("  Warning: could not load policy file: %v\n", polErr)
-	} else if policy != nil {
-		gray.Printf("  Loaded policy from %s (%d ignore rules)\n", cfg.PolicyFile, len(policy.Ignore))
-		agg.ApplyPolicy(policy)
+	} else if pol != nil {
+		gray.Printf("  Loaded policy from %s (%d active ignore rules)\n", cfg.PolicyFile, len(pol.Ignore))
+		agg.ApplyPolicy(pol)
 	}
 
 	if err := agg.SaveCombined(cfg.OutputFile); err != nil {
@@ -181,21 +227,25 @@ func runScan(cfg *config.Config) error {
 
 	// Summary Table
 	summary := agg.ComputeSummary()
-	printSummaryTable(summary, time.Since(startTime), cfg.FailOnSeverity)
+	printSummaryTable(summary, time.Since(startTime), cfg.FailOnSeverity, plan.EffectiveMode)
 
-	// Evaluate Exit Code
-	if agg.ShouldFail(cfg.FailOnSeverity) {
-		redBold.Printf("\n❌ Build Failed: Security findings exceed fail-on-severity threshold (%s)\n", cfg.FailOnSeverity)
+	// Gate Evaluation
+	shouldFail, failReason := agg.EvaluateGate(pol, cfg.FailOnSeverity)
+	if shouldFail {
+		redBold.Printf("\n❌ Build Failed: %s\n", failReason)
 		os.Exit(1)
 	}
 
-	greenBold.Println("\n✅ Audit Passed: No security findings exceeded threshold.")
+	greenBold.Println("\n✅ Audit Passed: All policy checks and security gates satisfied.")
 	return nil
 }
 
-func printSummaryTable(summary *aggregator.Summary, elapsed time.Duration, failThreshold string) {
-	whiteBold.Println("====================== SCAN SUMMARY ======================")
-	fmt.Printf(" Total Findings: %s\n", whiteBold.Sprintf("%d", summary.Total))
+func printSummaryTable(summary *aggregator.Summary, elapsed time.Duration, failThreshold, mode string) {
+	whiteBold.Println("=========================== SCAN SUMMARY ===========================")
+	fmt.Printf(" Mode:           %s\n", color.CyanString(mode))
+	fmt.Printf(" Total Findings: %s (Suppressed: %s)\n",
+		whiteBold.Sprintf("%d", summary.Total),
+		color.HiBlackString("%d", summary.Suppressed))
 	fmt.Printf("   • CRITICAL:   %s\n", color.RedString("%d", summary.Critical))
 	fmt.Printf("   • HIGH:       %s\n", color.MagentaString("%d", summary.High))
 	fmt.Printf("   • MEDIUM:     %s\n", color.YellowString("%d", summary.Medium))
@@ -203,7 +253,14 @@ func printSummaryTable(summary *aggregator.Summary, elapsed time.Duration, failT
 	fmt.Printf("   • NOTE:       %s\n", color.WhiteString("%d", summary.Note))
 	fmt.Printf(" Fail Threshold: %s\n", color.HiYellowString(failThreshold))
 	fmt.Printf(" Execution Time: %s\n", gray.Sprint(elapsed.Round(time.Millisecond)))
-	whiteBold.Println("==========================================================")
+
+	if len(summary.ByEngine) > 0 {
+		fmt.Printf(" Engine Breakdown:\n")
+		for eng, cnt := range summary.ByEngine {
+			fmt.Printf("   • %-10s: %d finding(s)\n", eng, cnt)
+		}
+	}
+	whiteBold.Println("====================================================================")
 
 	if len(summary.Findings) > 0 {
 		fmt.Println()
@@ -225,8 +282,9 @@ func printSummaryTable(summary *aggregator.Summary, elapsed time.Duration, failT
 				sevBadge = color.BlueString("[%s]", f.Severity)
 			}
 
-			fmt.Printf("  %s %s - %s (%s:%d)\n",
+			fmt.Printf("  %s %-8s %s - %s (%s:%d)\n",
 				sevBadge,
+				color.HiBlackString("[%s]", f.Engine),
 				color.HiWhiteString(f.RuleID),
 				f.Message,
 				f.FilePath,

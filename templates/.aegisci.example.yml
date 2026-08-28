@@ -1,22 +1,55 @@
 # ==============================================================================
-# AegisCI Security Policy Configuration (.aegisci.yml)
+# AegisCI Policy-as-Code Configuration (.aegisci.yml) - v2.0
 # ==============================================================================
-version: "1.0"
+version: "2.0"
 
 settings:
   fail_on_unpatched_cves: false # Do not block builds if no vendor patch exists
+  max_critical: 0               # Zero tolerance for critical vulnerabilities
+  max_high: 2                   # Max allowed high findings before gate failure
+  max_medium: 10                # Max allowed medium findings
 
-# List exceptions/suppressions for accepted risks or false positives
+# List active suppressions with path patterns and optional expiry dates
 ignore:
-  - id: "G401" # Rule ID from Semgrep / Gosec
+  - id: "G401"
     path: "pkg/legacy/hash.go"
-    reason: "Non-cryptographic checksum calculation"
+    reason: "Non-cryptographic hash used for caching"
+    expires: "2026-12-31"
 
   - id: "generic-api-key"
-    path: "test/fixtures/mock_token.env"
-    reason: "Synthetic test fixture with dummy token"
+    path: "test/fixtures/**"
+    reason: "Synthetic dummy tokens in unit test fixtures"
+    expires: "2027-01-01"
+
+  - id: "CKV_DOCKER_2"
+    path: "Dockerfile*"
+    reason: "HEALTHCHECK instruction not needed on temporary job runner images"
+
+  - id: "CVE-2023-44487"
+    path: "go.mod"
+    reason: "Internal non-HTTP/2 backend service with mitigating upstream proxy"
     expires: "2026-12-31"
 
-  - id: "CVE-2023-99999"
-    reason: "Internal air-gapped service not reachable from public ingress"
-    expires: "2026-12-31"
+# License compliance policies for open-source dependencies
+license_policy:
+  banned:
+    - "GPL-3.0"
+    - "AGPL-3.0"
+    - "SSPL"
+  allowed:
+    - "MIT"
+    - "Apache-2.0"
+    - "BSD-2-Clause"
+    - "BSD-3-Clause"
+    - "ISC"
+
+# SCA dependency configurations
+sca:
+  ignore_dev_dependencies: true
+  exclude_packages:
+    - "mocha"
+    - "jest"
+
+# IaC scanning configuration
+iac:
+  excluded_frameworks: []

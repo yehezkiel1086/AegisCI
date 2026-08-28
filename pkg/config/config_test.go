@@ -1,8 +1,6 @@
 package config
 
 import (
-	"os"
-	"path/filepath"
 	"testing"
 )
 
@@ -48,33 +46,15 @@ func TestSeverityRank(t *testing.T) {
 	}
 }
 
-func TestLoadPolicyFile(t *testing.T) {
-	tmpDir := t.TempDir()
-	policyPath := filepath.Join(tmpDir, ".aegisci.yml")
-
-	content := `version: "1.0"
-settings:
-  fail_on_unpatched_cves: true
-ignore:
-  - id: "G401"
-    path: "pkg/legacy/hash.go"
-    reason: "Legacy non-cryptographic usage"
-`
-	if err := os.WriteFile(policyPath, []byte(content), 0644); err != nil {
-		t.Fatalf("Failed to write temp policy file: %v", err)
+func TestDefaultConfig(t *testing.T) {
+	cfg := DefaultConfig()
+	if !cfg.EnableSAST || !cfg.EnableSecrets || !cfg.EnableSCA || !cfg.EnableIaC {
+		t.Errorf("Expected default v2.0 config to enable SAST, Secrets, SCA, and IaC")
 	}
-
-	policy, err := LoadPolicyFile(policyPath)
-	if err != nil {
-		t.Fatalf("LoadPolicyFile failed: %v", err)
+	if cfg.FailOnSeverity != SeverityHigh {
+		t.Errorf("Expected default FailOnSeverity to be HIGH, got %s", cfg.FailOnSeverity)
 	}
-	if policy == nil {
-		t.Fatalf("Expected policy, got nil")
-	}
-	if !policy.Settings.FailOnUnpatchedCVEs {
-		t.Errorf("Expected FailOnUnpatchedCVEs to be true")
-	}
-	if len(policy.Ignore) != 1 || policy.Ignore[0].ID != "G401" {
-		t.Errorf("Expected 1 ignore rule with ID G401, got %+v", policy.Ignore)
+	if cfg.SBOMFormat != SBOMFormatCycloneDX {
+		t.Errorf("Expected default SBOM format to be cyclonedx-json, got %s", cfg.SBOMFormat)
 	}
 }

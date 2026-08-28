@@ -17,6 +17,11 @@ type Scanner interface {
 	Scan(ctx context.Context, targetDir string) (*sarif.Report, error)
 }
 
+// SBOMGenerator defines the interface for engines capable of exporting Software Bill of Materials.
+type SBOMGenerator interface {
+	GenerateSBOM(ctx context.Context, targetDir, format, outputPath string) error
+}
+
 // ScanResult holds the result of a single scanner execution.
 type ScanResult struct {
 	ScannerName string

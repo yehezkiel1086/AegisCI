@@ -2,10 +2,7 @@ package config
 
 import (
 	"fmt"
-	"os"
 	"strings"
-
-	"gopkg.in/yaml.v3"
 )
 
 // Severity levels
@@ -24,6 +21,12 @@ const (
 	ModeDeepScan = "deep-scan"
 )
 
+// SBOM Formats
+const (
+	SBOMFormatCycloneDX = "cyclonedx-json"
+	SBOMFormatSPDX      = "spdx-json"
+)
+
 // Config holds runtime configuration options for the AegisCI orchestrator.
 type Config struct {
 	TargetDir      string `yaml:"target_dir"`
@@ -36,32 +39,14 @@ type Config struct {
 	EnableIaC      bool   `yaml:"iac"`
 	EnableDAST     bool   `yaml:"dast"`
 	DASTTargetURL  string `yaml:"dast_target_url"`
+	GenerateSBOM   bool   `yaml:"sbom"`
+	SBOMFormat     string `yaml:"sbom_format"`
+	SBOMOutput     string `yaml:"sbom_output"`
 	PolicyFile     string `yaml:"policy_file"`
 	Verbose        bool   `yaml:"verbose"`
 }
 
-// PolicyConfig represents the structure of .aegisci.yml policy file.
-type PolicyConfig struct {
-	Version    string         `yaml:"version"`
-	Settings   PolicySettings `yaml:"settings"`
-	Ignore     []PolicyIgnore `yaml:"ignore"`
-	Exceptions []PolicyIgnore `yaml:"exceptions"` // Alias/support for exceptions
-}
-
-// PolicySettings defines general policy settings.
-type PolicySettings struct {
-	FailOnUnpatchedCVEs bool `yaml:"fail_on_unpatched_cves"`
-}
-
-// PolicyIgnore defines an exception or suppression rule.
-type PolicyIgnore struct {
-	ID      string `yaml:"id"`
-	Path    string `yaml:"path"`
-	Reason  string `yaml:"reason"`
-	Expires string `yaml:"expires"`
-}
-
-// DefaultConfig returns default configuration values.
+// DefaultConfig returns default configuration values for v2.0.
 func DefaultConfig() *Config {
 	return &Config{
 		TargetDir:      ".",
@@ -70,10 +55,13 @@ func DefaultConfig() *Config {
 		FailOnSeverity: SeverityHigh,
 		EnableSAST:     true,
 		EnableSecrets:  true,
-		EnableSCA:      false,
-		EnableIaC:      false,
+		EnableSCA:      true, // Enabled by default in v2.0
+		EnableIaC:      true, // Enabled by default in v2.0
 		EnableDAST:     false,
 		DASTTargetURL:  "",
+		GenerateSBOM:   false,
+		SBOMFormat:     SBOMFormatCycloneDX,
+		SBOMOutput:     "sbom.cdx.json",
 		PolicyFile:     ".aegisci.yml",
 		Verbose:        false,
 	}
@@ -122,7 +110,7 @@ func SeverityRank(sev string) int {
 func MapSARIFLevelToSeverity(level string) string {
 	switch strings.ToLower(level) {
 	case "error":
-		return SeverityHigh // Standard SARIF error maps to HIGH (or CRITICAL)
+		return SeverityHigh
 	case "warning":
 		return SeverityMedium
 	case "note":
@@ -130,28 +118,4 @@ func MapSARIFLevelToSeverity(level string) string {
 	default:
 		return SeverityLow
 	}
-}
-
-// LoadPolicyFile attempts to load policy configuration from the given file path.
-func LoadPolicyFile(path string) (*PolicyConfig, error) {
-	if _, err := os.Stat(path); os.IsNotExist(err) {
-		return nil, nil // Not an error if optional policy file doesn't exist
-	}
-
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read policy file %s: %w", path, err)
-	}
-
-	var policy PolicyConfig
-	if err := yaml.Unmarshal(data, &policy); err != nil {
-		return nil, fmt.Errorf("failed to parse policy file %s: %w", path, err)
-	}
-
-	// Merge exceptions into Ignore for backward/forward compatibility
-	if len(policy.Exceptions) > 0 {
-		policy.Ignore = append(policy.Ignore, policy.Exceptions...)
-	}
-
-	return &policy, nil
 }

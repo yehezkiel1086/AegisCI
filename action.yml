@@ -1,5 +1,5 @@
 name: 'AegisCI Security Orchestrator'
-description: 'All-in-One DevSecOps Scanner & Security Orchestrator for GitHub Actions (SAST, Secrets, SCA, IaC).'
+description: 'All-in-One DevSecOps Scanner & Security Orchestrator for GitHub Actions (SAST, Secrets, SCA, IaC, SBOM).'
 author: 'AegisCI'
 branding:
   icon: 'shield'
@@ -7,7 +7,7 @@ branding:
 
 inputs:
   mode:
-    description: 'Execution mode (auto, pr-check, deep-scan)'
+    description: 'Execution mode: auto (default), pr-check, or deep-scan'
     required: false
     default: 'auto'
   fail-on-severity:
@@ -22,6 +22,26 @@ inputs:
     description: 'Enable Secret Detection (Gitleaks)'
     required: false
     default: 'true'
+  sca:
+    description: 'Enable Software Composition Analysis (Trivy)'
+    required: false
+    default: 'true'
+  iac:
+    description: 'Enable Infrastructure-as-Code Auditing (Checkov)'
+    required: false
+    default: 'true'
+  sbom:
+    description: 'Generate Software Bill of Materials (SBOM)'
+    required: false
+    default: 'false'
+  sbom-format:
+    description: 'SBOM format: cyclonedx-json, spdx-json'
+    required: false
+    default: 'cyclonedx-json'
+  sbom-output:
+    description: 'Output destination path for SBOM file'
+    required: false
+    default: 'sbom.cdx.json'
   target:
     description: 'Directory or repository root to scan'
     required: false
@@ -43,6 +63,9 @@ outputs:
   sarif-path:
     description: 'Path to the generated unified SARIF report'
     value: ${{ inputs.output }}
+  sbom-path:
+    description: 'Path to the generated SBOM file (if enabled)'
+    value: ${{ inputs.sbom-output }}
 
 runs:
   using: 'composite'
@@ -72,13 +95,32 @@ runs:
           python3 -m pip install --upgrade semgrep || pip install --upgrade semgrep || true
         fi
 
+    - name: Install Trivy
+      if: ${{ inputs.sca == 'true' || inputs.sbom == 'true' }}
+      shell: bash
+      run: |
+        if ! command -v trivy &> /dev/null; then
+          echo "Installing Trivy..."
+          TRIVY_VERSION="0.51.0"
+          curl -sSL "https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}/trivy_${TRIVY_VERSION}_Linux-64bit.tar.gz" | tar -xz -C /usr/local/bin trivy || true
+        fi
+
+    - name: Install Checkov
+      if: ${{ inputs.iac == 'true' }}
+      shell: bash
+      run: |
+        if ! command -v checkov &> /dev/null; then
+          echo "Installing Checkov..."
+          python3 -m pip install --upgrade checkov || pip install --upgrade checkov || true
+        fi
+
     - name: Build AegisCI Orchestrator
       shell: bash
       run: |
         cd ${{ github.action_path }}
         go build -o /tmp/aegisci ./cmd/aegisci
 
-    - name: Run AegisCI Security Scan
+    - name: Run AegisCI Security Suite
       shell: bash
       run: |
         /tmp/aegisci \
@@ -88,6 +130,11 @@ runs:
           --fail-on-severity="${{ inputs.fail-on-severity }}" \
           --sast="${{ inputs.sast }}" \
           --secrets="${{ inputs.secrets }}" \
+          --sca="${{ inputs.sca }}" \
+          --iac="${{ inputs.iac }}" \
+          --sbom="${{ inputs.sbom }}" \
+          --sbom-format="${{ inputs.sbom-format }}" \
+          --sbom-output="${{ inputs.sbom-output }}" \
           --policy-file="${{ inputs.policy-file }}"
 
     - name: Upload Unified SARIF to GitHub Code Scanning

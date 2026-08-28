@@ -1,6 +1,11 @@
 # ==============================================================================
-# AegisCI Runner Image
-# Pre-packaged with Go runtime, Semgrep SAST, Gitleaks Secrets Detection, and AegisCI CLI
+# AegisCI Runner Image (v2.0)
+# Pre-packaged with:
+# - Go Runtime & AegisCI CLI Orchestrator
+# - Semgrep (SAST)
+# - Gitleaks (Secrets Detection)
+# - Trivy (SCA & SBOM Generation)
+# - Checkov (IaC & Container Auditing)
 # ==============================================================================
 
 # Stage 1: Build AegisCI binary
@@ -17,21 +22,28 @@ RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o /aegisci ./cmd/aegisci
 FROM python:3.11-slim
 
 LABEL maintainer="AegisCI Team"
-LABEL description="All-in-One DevSecOps Security Orchestrator"
+LABEL description="All-in-One DevSecOps Security Orchestrator (v2.0)"
 
-# Install system dependencies, git, and gitleaks
+# Install system dependencies, git, curl, tar
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     git \
     ca-certificates \
     tar \
-    && GITLEAKS_VERSION="8.18.4" \
-    && curl -sSL "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz" | tar -xz -C /usr/local/bin gitleaks \
-    && chmod +x /usr/local/bin/gitleaks \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Semgrep
-RUN pip install --no-cache-dir --upgrade semgrep
+# Install Gitleaks
+RUN GITLEAKS_VERSION="8.18.4" \
+    && curl -sSL "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz" | tar -xz -C /usr/local/bin gitleaks \
+    && chmod +x /usr/local/bin/gitleaks
+
+# Install Trivy
+RUN TRIVY_VERSION="0.51.0" \
+    && curl -sSL "https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}/trivy_${TRIVY_VERSION}_Linux-64bit.tar.gz" | tar -xz -C /usr/local/bin trivy \
+    && chmod +x /usr/local/bin/trivy
+
+# Install Semgrep and Checkov via pip
+RUN pip install --no-cache-dir --upgrade semgrep checkov
 
 # Copy AegisCI orchestrator binary
 COPY --from=builder /aegisci /usr/local/bin/aegisci

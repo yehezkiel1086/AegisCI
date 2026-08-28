@@ -123,27 +123,57 @@ func (p *Policy) ShouldIgnore(ruleID, filePath string, now time.Time) (bool, str
 
 // matchPath compares a policy pattern against a file path using substring or glob matching.
 func matchPath(pattern, filePath string) bool {
-	normPattern := filepath.ToSlash(pattern)
-	normPath := filepath.ToSlash(filePath)
+	normPattern := strings.TrimPrefix(filepath.ToSlash(pattern), "./")
+	normPath := strings.TrimPrefix(filepath.ToSlash(filePath), "./")
 
-	// Direct match or substring match
-	if normPattern == normPath || strings.Contains(normPath, normPattern) {
+	// Direct match or universal wildcard
+	if normPattern == normPath || normPattern == "**" || normPattern == "*" {
 		return true
 	}
 
-	// Glob matching
+	// Substring match for non-wildcard patterns
+	if !strings.Contains(normPattern, "*") && strings.Contains(normPath, normPattern) {
+		return true
+	}
+
+	// Standard glob matching across whole path or filename
 	matched, err := filepath.Match(normPattern, normPath)
 	if err == nil && matched {
 		return true
 	}
+	matchedBase, err := filepath.Match(normPattern, filepath.Base(normPath))
+	if err == nil && matchedBase {
+		return true
+	}
 
-	// Handle recursive wildcard "**/"
-	if strings.Contains(normPattern, "**/") {
-		prefix := strings.Split(normPattern, "**/")[0]
-		suffix := strings.Split(normPattern, "**/")[1]
-		if (prefix == "" || strings.HasPrefix(normPath, prefix)) &&
-			(suffix == "" || strings.HasSuffix(normPath, suffix) || matchGlobSuffix(normPath, suffix)) {
-			return true
+	// Handle recursive wildcard "**"
+	if strings.Contains(normPattern, "**") {
+		// Suffix pattern: e.g. "test/fixtures/**"
+		if strings.HasSuffix(normPattern, "/**") {
+			prefix := strings.TrimSuffix(normPattern, "/**")
+			if normPath == prefix || strings.HasPrefix(normPath, prefix+"/") || strings.Contains(normPath, prefix+"/") {
+				return true
+			}
+		}
+
+		// Prefix pattern: e.g. "**/*.env" or "**/secret.env"
+		if strings.HasPrefix(normPattern, "**/") {
+			suffix := strings.TrimPrefix(normPattern, "**/")
+			if strings.HasSuffix(normPath, suffix) || matchGlobSuffix(normPath, suffix) {
+				return true
+			}
+		}
+
+		// Split by "**"
+		parts := strings.Split(normPattern, "**")
+		if len(parts) == 2 {
+			prefix := strings.TrimSuffix(parts[0], "/")
+			suffix := strings.TrimPrefix(parts[1], "/")
+			prefixMatches := prefix == "" || normPath == prefix || strings.HasPrefix(normPath, prefix+"/") || strings.Contains(normPath, prefix+"/")
+			suffixMatches := suffix == "" || strings.HasSuffix(normPath, suffix) || matchGlobSuffix(normPath, suffix)
+			if prefixMatches && suffixMatches {
+				return true
+			}
 		}
 	}
 
