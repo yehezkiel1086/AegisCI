@@ -1,37 +1,46 @@
 # 🛡️ AegisCI
 
-> **All-in-One DevSecOps Scanner & Security Orchestrator for GitHub Actions.**  
-> Consolidate SAST, DAST, Secrets Detection, SCA, and IaC Auditing into a single Go-powered action with native GitHub Security Tab integration.
+> **All-in-One DevSecOps Scanner, Policy-as-Code Engine & Enterprise Security Orchestrator for GitHub Actions.**  
+> Consolidate SAST, DAST, Secrets Detection, SCA, IaC Auditing, CI Workflow Linters, and AI Remediation into a single Go-powered orchestrator with native GitHub Security Tab integration.
 
-[![GitHub Release](https://img.shields.io/github/v/release/your-org/aegisci?style=flat-square&color=blue)](https://github.com/your-org/aegisci/releases)
+[![GitHub Release](https://img.shields.io/github/v/release/yehezkiel1086/AegisCI?style=flat-square&color=blue)](https://github.com/yehezkiel1086/AegisCI/releases)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](LICENSE)
 [![GitHub Marketplace](https://img.shields.io/badge/Marketplace-AegisCI-purple?style=flat-square&logo=github)](https://github.com/marketplace/actions/aegisci)
-[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg?style=flat-square)](CONTRIBUTING.md)
+[![Documentation: How to Use](https://img.shields.io/badge/Docs-How%20to%20Use-brightgreen.svg?style=flat-square)](docs/USAGE.md)
 
 ---
 
 ## 🚀 Why AegisCI?
 
-Security tool sprawl kills pipeline performance and frustrates engineering teams. Maintaining separate workflow configurations for static code analysis, dependency audits, container scanning, secret detection, and dynamic API testing leads to fragmented reports and alert fatigue.
+Security tool sprawl hurts CI/CD pipeline performance and creates alert fatigue. Maintaining separate actions for static analysis, secret checking, dependency auditing, container scanning, dynamic API testing, and workflow linting produces fragmented reports across disparate dashboards.
 
-**AegisCI** brings end-to-end security automation into a single GitHub Action. It auto-detects your repository stack, runs light or deep security suites based on pipeline triggers, and merges all findings into a **single unified SARIF report** uploaded straight to your GitHub Security tab.
+**AegisCI** provides a single Go-powered orchestrator for your entire DevSecOps pipeline:
+1. **Multi-Engine Concurrency**: Runs **Semgrep**, **Gitleaks**, **Trivy**, **Checkov**, **Zizmor**, **OWASP ZAP**, and **Custom Plugins** concurrently in parallel goroutines.
+2. **Unified SARIF v2.1.0**: Deduplicates and aggregates all findings into a single SARIF document rendered directly in **Security → Code scanning alerts**.
+3. **Inline PR Annotations**: Emits native GitHub Workflow Commands to display security issues directly on Pull Request code diffs.
+4. **Smart Pipeline Modes**: Dynamically routes execution between fast **`pr-check`** (< 3 mins) and comprehensive **`deep-scan`**.
+5. **Policy-as-Code (`.aegisci.yml`)**: Manage suppressions with expiration dates, glob matching, tolerance limits, and license compliance rules.
+6. **AI Remediation Engine (v4.0)**: Automatically generates unified Git diff patch files (`.patch`) for detected vulnerabilities using LLMs.
+7. **Enterprise Extensibility (v4.0)**: Supports custom WASM/executable plugins and centralized dashboard telemetry streaming.
 
 ---
 
-## ✨ Key Features
+## 📊 Security Pillars
 
-| Security Pillar | Engines / Capabilities | What It Secures |
+| Security Pillar | Engine | What It Secures |
 | :--- | :--- | :--- |
-| **SAST** | SonarScanner, Semgrep | Source code vulnerabilities, anti-patterns, OWASP Top 10 |
-| **DAST** | OWASP ZAP (Baseline & Full API) | Runtime endpoints, header misconfigurations, exposure |
-| **SCA & SBOM** | Trivy, Syft | Vulnerable open-source packages (`npm`, `pip`, `go.mod`), SPDX/CycloneDX SBOMs |
-| **Secrets Detection** | Gitleaks | Leaked API keys, private certificates, cloud tokens with optional live checks |
-| **IaC & Containers** | Checkov, KICS | Misconfigured Terraform, Dockerfiles, Kubernetes manifests |
-| **Workflow Hardening**| Zizmor | Unpinned GitHub Actions, script injections inside `.github/workflows/` |
+| **Secrets Detection** | **Gitleaks** | Leaked API tokens, private keys, database credentials, AWS keys |
+| **SAST** | **Semgrep** | Source code vulnerabilities, SQL injections, XSS, insecure crypto |
+| **SCA & SBOM** | **Trivy** | Vulnerable open-source packages across 15+ lockfiles; CycloneDX/SPDX SBOMs |
+| **IaC & Containers** | **Checkov** | Misconfigured Terraform (`.tf`), Dockerfiles, Kubernetes manifests, Helm |
+| **DAST** | **OWASP ZAP** | Web app & API runtime vulnerabilities with automated URL health check |
+| **CI Meta-Security** | **Zizmor** | Unpinned GitHub Actions (`@v4`), script injection risks in `.github/workflows/` |
+| **AI Remediation** | **LLM Engine** | Automated code fix patch generation (`patches/*.patch`) |
+| **Custom Plugins** | **Plugin SDK** | Custom corporate compliance rules (WASM, Python, Bash, Go) |
 
 ---
 
-## 📦 Quickstart
+## ⚡ Quickstart
 
 Add AegisCI to `.github/workflows/security.yml` in your repository:
 
@@ -46,10 +55,12 @@ on:
 
 jobs:
   security-scan:
+    name: AegisCI Full-Spectrum Audit
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      security-events: write # Required for GitHub Security Tab upload
+      security-events: write # Required for GitHub Code Scanning Tab upload
+      pull-requests: write   # For inline PR annotations
 
     steps:
       - name: Checkout Code
@@ -58,128 +69,117 @@ jobs:
           fetch-depth: 0
 
       - name: Run AegisCI Security Suite
-        uses: your-org/aegisci@v1
+        uses: yehezkiel1086/AegisCI@v1
         with:
-          mode: "auto" # Runs lightweight 'pr-check' on PRs, full scan on merge
-          fail-on-severity: "HIGH"
-
+          mode: 'auto'              # 'pr-check' on PRs, 'deep-scan' on merge
+          fail-on-severity: 'HIGH'  # Blocks build on HIGH or CRITICAL findings
+          sbom: 'true'              # Exports CycloneDX SBOM
 ```
 
 ---
 
-## ⚡ PR-Check vs. Deep-Scan Modes
-
-AegisCI automatically scales its scan depth depending on the workflow context to protect pipeline speeds:
-
-* **PR-Check (Fast)**: Optimized for fast developer feedback (< 3 mins). Runs SAST, secret checks, dependency auditing, and a light OWASP ZAP Baseline scan.
-* **Deep-Scan (Comprehensive)**: Triggered on main branch pushes or releases (~10-15 mins). Executes full active DAST crawls, full container layer auditing, and deep IaC compliance policies.
-
-```yaml
-- name: AegisCI PR Gate
-  uses: your-org/aegisci@v1
-  with:
-    mode: "pr-check"
-    sast: true
-    dast: true
-    dast-target-url: "http://localhost:8080"
+## 📦 Architecture & Orchestration Flow
 
 ```
-
----
-
-## 🛠️ Inputs & Configuration
-
-| Input | Description | Default | Required |
-| --- | --- | --- | --- |
-| `mode` | Execution mode: `auto`, `pr-check`, or `deep-scan`. | `auto` | No |
-| `fail-on-severity` | Fail pipeline on findings: `LOW`, `MEDIUM`, `HIGH`, `CRITICAL`. | `HIGH` | No |
-| `sast` | Enable Static Application Security Testing. | `true` | No |
-| `dast` | Enable Dynamic Application Security Testing (OWASP ZAP). | `false` | No |
-| `dast-target-url` | Web app URL or local HTTP endpoint for DAST scanning. | `""` | Optional |
-| `secrets` | Enable secret scanning via Gitleaks engine. | `true` | No |
-| `sca` | Enable Software Composition Analysis & SBOM generation. | `true` | No |
-| `iac` | Enable Infrastructure-as-Code & Container scanning. | `true` | No |
-| `upload-sarif` | Automatically upload unified SARIF to GitHub Code Scanning. | `true` | No |
-| `policy-file` | Path to custom `.aegisci.yml` policy rules. | `.aegisci.yml` | No |
-
----
-
-## 🎯 Unified SARIF & GitHub Code Scanning
-
-AegisCI aggregates output across all scanning engines into a single valid `results.sarif` file. Vulnerabilities appear directly inline on Pull Request diffs and inside **Security → Code scanning alerts**.
-
+┌────────────────────────────────────────────────────────────────────────┐
+│                      AegisCI Enterprise Orchestrator                   │
+│                                                                        │
+│   1. Stack Auto-Detection & Smart Mode Router (pr-check / deep-scan)   │
+│   2. Concurrent Engine Execution (Parallel Goroutines)                 │
+│      ├── Semgrep (SAST)           ├── Trivy (SCA & SBOM)               │
+│      ├── Gitleaks (Secrets)       ├── Checkov (IaC)                    │
+│      ├── Zizmor (CI Workflows)    ├── OWASP ZAP (DAST Runtime)         │
+│      └── Custom Plugins Engine (WASM / Executable Plugin SDK)          │
+│                                                                        │
+│   3. SARIF Aggregator, Deduplicator & Policy-as-Code Engine            │
+│   4. AI Remediation Engine (Automated Patch Diffs)                     │
+│   5. Unified Dispatcher:                                               │
+│      ├── GitHub Inline PR Annotations (::error file=...,line=...)      │
+│      ├── Unified results.sarif -> GitHub Code Scanning Tab             │
+│      └── Enterprise Dashboard Webhook Telemetry Streamer               │
+└────────────────────────────────────────────────────────────────────────┘
 ```
-┌────────────────────────────────────────────────────────┐
-│                    AegisCI Engine                      │
-│                                                        │
-│  [SAST Engine]   [DAST Engine]   [Secrets]   [SCA Engine] │
-│        │                │            │           │     │
-│        └──────────┬─────┴────────────┴───────────┘     │
-│                   ▼                                    │
-│        Unified SARIF Aggregator                        │
-└───────────────────┬────────────────────────────────────┘
-                    │
-                    ▼
-   GitHub Code Scanning (Security Tab)
-
-```
-
-> [!TIP]
-> Ensure your workflow job includes the permission `security-events: write` so AegisCI can post security findings to the repository's Security dashboard.
 
 ---
 
 ## 📄 Policy-as-Code (`.aegisci.yml`)
 
-Fine-tune rules, bypass false positives, and set grace periods by adding a `.aegisci.yml` file to your repository root:
+Fine-tune rules, bypass false positives with expiration dates, and set license compliance policies by adding `.aegisci.yml` to your repository root:
 
 ```yaml
-version: "1.0"
+version: "4.0"
 
 settings:
   fail_on_unpatched_cves: false # Don't block builds if no vendor fix exists
+  max_critical: 0               # Zero tolerance for critical vulnerabilities
+  max_high: 2                   # Allow up to 2 high findings before failing
 
-exceptions:
-  - id: "CVE-2023-XXXXX"
-    reason: "Internal microservice not exposed to public network"
-    expires: "2026-12-31"
+ignore:
+  - id: "G401"
+    path: "pkg/legacy/hash.go"
+    reason: "Non-cryptographic hash used for caching"
+    expires: "2026-12-31"       # Exception automatically expires after date
 
-  - id: "G304" # Semgrep file path provided as taint input
-    path: "src/utils/fileReader.ts"
-    reason: "Path validated by internal sanitizer routine"
+  - id: "generic-api-key"
+    path: "test/fixtures/**"    # Recursive glob matching
+    reason: "Synthetic test fixture with dummy token"
+
+license_policy:
+  banned:
+    - "GPL-3.0"
+    - "AGPL-3.0"
+  allowed:
+    - "MIT"
+    - "Apache-2.0"
+    - "BSD-3-Clause"
 
 dast:
   exclude_paths:
     - "/logout"
     - "/admin/reset-db"
-
 ```
+
+---
+
+## 💻 Local CLI Usage
+
+```bash
+# Build the binary
+go build -o bin/aegisci ./cmd/aegisci
+
+# Run default audit
+./bin/aegisci --target .
+
+# Run fast PR-Check mode
+./bin/aegisci --target . --mode pr-check
+
+# Run deep scan with SBOM and AI Remediation
+./bin/aegisci --target . --mode deep-scan --sbom --ai-remediation --ai-provider gemini --ai-api-key $GEMINI_API_KEY
+
+# Run DAST against staging endpoint
+./bin/aegisci --target . --dast --dast-target-url https://staging.example.com
+```
+
+---
+
+## 📚 Detailed Documentation
+
+For full guides, detailed configuration options, CLI reference, and recipe workflows, please see:
+👉 **[Complete How-To-Use Guide (`docs/USAGE.md`)](docs/USAGE.md)**
 
 ---
 
 ## 🤝 Contributing
 
-Contributions are warmly welcome! Whether you want to add a new security engine, optimize SARIF parsing logic, or improve documentation:
-
+Contributions are warmly welcome!
 1. Fork the project repository.
-2. Create your feature branch (`git checkout -b feat/new-engine`).
-3. Commit changes (`git commit -m 'feat: add custom SAST rule module'`).
-4. Push to the branch (`git push origin feat/new-engine`).
-5. Open a Pull Request.
-
-Please see our [CONTRIBUTING.md](https://www.google.com/search?q=CONTRIBUTING.md) guide for build instructions and local testing setups.
+2. Create your feature branch (`git checkout -b feat/custom-engine`).
+3. Commit your changes (`git commit -m 'feat: add custom engine'`).
+4. Run tests: `go test -v -race ./...`
+5. Push to your branch and open a Pull Request.
 
 ---
 
 ## 📜 License
 
-Distributed under the **MIT License**. See [`LICENSE`](https://www.google.com/search?q=LICENSE) for details.
-
-```
-
-<ElicitationsGroup message="What component of AegisCI would you like to construct next?">
-  <Elicitation label="Draft the action.yml metadata manifest" query="Draft the action.yml file for the AegisCI composite GitHub Action using the new input parameter schema."/>
-  <Elicitation label="Write the Go code for the .aegisci.yml policy evaluator" query="Write the Go package for parsing .aegisci.yml policy files and filtering SARIF results based on exception rules."/>
-</ElicitationsGroup>
-
-```
+Distributed under the **MIT License**. See [`LICENSE`](LICENSE) for details.
