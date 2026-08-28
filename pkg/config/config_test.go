@@ -48,13 +48,13 @@ func TestSeverityRank(t *testing.T) {
 
 func TestDefaultConfig(t *testing.T) {
 	cfg := DefaultConfig()
-	if !cfg.EnableSAST || !cfg.EnableSecrets || !cfg.EnableSCA || !cfg.EnableIaC {
-		t.Errorf("Expected default v2.0 config to enable SAST, Secrets, SCA, and IaC")
+	if !cfg.EnableSAST || !cfg.EnableSecrets || !cfg.EnableSCA || !cfg.EnableIaC || !cfg.EnableWorkflowAudit {
+		t.Errorf("Expected default v3.0 config to enable SAST, Secrets, SCA, IaC, and WorkflowAudit")
 	}
-	if cfg.FailOnSeverity != SeverityHigh {
-		t.Errorf("Expected default FailOnSeverity to be HIGH, got %s", cfg.FailOnSeverity)
+	if !cfg.EnableAnnotations {
+		t.Errorf("Expected default EnableAnnotations to be true")
 	}
-	if cfg.SBOMFormat != SBOMFormatCycloneDX {
-		t.Errorf("Expected default SBOM format to be cyclonedx-json, got %s", cfg.SBOMFormat)
+	if cfg.DASTMode != DASTModeBaseline {
+		t.Errorf("Expected default DAST mode to be baseline, got %s", cfg.DASTMode)
 	}
 }

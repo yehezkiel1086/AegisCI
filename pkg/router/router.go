@@ -9,28 +9,34 @@ import (
 
 // Plan encapsulates the resolved execution mode, decision reasoning, and engine profile.
 type Plan struct {
-	RequestedMode  string
-	EffectiveMode  string
-	Reason         string
-	EnableSecrets  bool
-	EnableSAST     bool
-	EnableSCA      bool
-	EnableIaC      bool
-	EnableDAST     bool
-	GenerateSBOM   bool
-	FastTimeoutSec int
+	RequestedMode       string
+	EffectiveMode       string
+	Reason              string
+	EnableSecrets       bool
+	EnableSAST          bool
+	EnableSCA           bool
+	EnableIaC           bool
+	EnableDAST          bool
+	DASTTargetURL       string
+	DASTMode            string
+	EnableWorkflowAudit bool
+	GenerateSBOM        bool
+	FastTimeoutSec      int
 }
 
 // ResolvePlan determines the optimal scanner profile and execution mode.
 func ResolvePlan(cfg *config.Config) *Plan {
 	plan := &Plan{
-		RequestedMode: cfg.Mode,
-		EnableSecrets: cfg.EnableSecrets,
-		EnableSAST:    cfg.EnableSAST,
-		EnableSCA:     cfg.EnableSCA,
-		EnableIaC:     cfg.EnableIaC,
-		EnableDAST:    cfg.EnableDAST,
-		GenerateSBOM:  cfg.GenerateSBOM,
+		RequestedMode:       cfg.Mode,
+		EnableSecrets:       cfg.EnableSecrets,
+		EnableSAST:          cfg.EnableSAST,
+		EnableSCA:           cfg.EnableSCA,
+		EnableIaC:           cfg.EnableIaC,
+		EnableDAST:          cfg.EnableDAST,
+		DASTTargetURL:       cfg.DASTTargetURL,
+		DASTMode:            cfg.DASTMode,
+		EnableWorkflowAudit: cfg.EnableWorkflowAudit,
+		GenerateSBOM:        cfg.GenerateSBOM,
 	}
 
 	mode := strings.ToLower(strings.TrimSpace(cfg.Mode))
@@ -56,10 +62,13 @@ func ResolvePlan(cfg *config.Config) *Plan {
 
 	// Apply mode-specific optimizations
 	if plan.EffectiveMode == config.ModePRCheck {
-		// PR-Check focuses on fast feedback (< 3 mins): Secrets + SAST + SCA
-		// Disable IaC in PR-check unless user explicitly enabled it
+		// PR-Check focuses on fast feedback (< 3 mins): Secrets + SAST + SCA + Workflow linter
 		if !cfg.EnableIaC {
 			plan.EnableIaC = false
+		}
+		// If DAST is requested in PR-check, limit to baseline scan
+		if plan.EnableDAST && plan.DASTMode == config.DASTModeFull {
+			plan.DASTMode = config.DASTModeBaseline
 		}
 		plan.FastTimeoutSec = 180 // 3 minutes timeout
 	} else {

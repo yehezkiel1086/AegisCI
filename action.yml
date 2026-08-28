@@ -1,5 +1,5 @@
 name: 'AegisCI Security Orchestrator'
-description: 'All-in-One DevSecOps Scanner & Security Orchestrator for GitHub Actions (SAST, Secrets, SCA, IaC, SBOM).'
+description: 'All-in-One DevSecOps Scanner & Security Orchestrator for GitHub Actions (SAST, DAST, Secrets, SCA, IaC, Workflow Linters).'
 author: 'AegisCI'
 branding:
   icon: 'shield'
@@ -30,6 +30,38 @@ inputs:
     description: 'Enable Infrastructure-as-Code Auditing (Checkov)'
     required: false
     default: 'true'
+  dast:
+    description: 'Enable Dynamic Application Security Testing (OWASP ZAP)'
+    required: false
+    default: 'false'
+  dast-target-url:
+    description: 'Target web application endpoint URL for DAST scanning'
+    required: false
+    default: ''
+  dast-mode:
+    description: 'DAST scan mode: baseline, api, full'
+    required: false
+    default: 'baseline'
+  workflow-audit:
+    description: 'Enable CI Workflow Security Audit (Zizmor)'
+    required: false
+    default: 'true'
+  annotations:
+    description: 'Emit inline PR code annotations via GitHub Actions workflow commands'
+    required: false
+    default: 'true'
+  vortex:
+    description: 'Enable Vortex Threat Intelligence feed queries'
+    required: false
+    default: 'false'
+  vortex-api-url:
+    description: 'Vortex API endpoint URL'
+    required: false
+    default: 'https://api.vortex-threatintel.io/v1'
+  vortex-api-key:
+    description: 'Vortex API authentication token'
+    required: false
+    default: ''
   sbom:
     description: 'Generate Software Bill of Materials (SBOM)'
     required: false
@@ -114,6 +146,15 @@ runs:
           python3 -m pip install --upgrade checkov || pip install --upgrade checkov || true
         fi
 
+    - name: Install Zizmor
+      if: ${{ inputs.workflow-audit == 'true' }}
+      shell: bash
+      run: |
+        if ! command -v zizmor &> /dev/null; then
+          echo "Installing Zizmor..."
+          python3 -m pip install --upgrade zizmor || pip install --upgrade zizmor || true
+        fi
+
     - name: Build AegisCI Orchestrator
       shell: bash
       run: |
@@ -132,6 +173,14 @@ runs:
           --secrets="${{ inputs.secrets }}" \
           --sca="${{ inputs.sca }}" \
           --iac="${{ inputs.iac }}" \
+          --dast="${{ inputs.dast }}" \
+          --dast-target-url="${{ inputs.dast-target-url }}" \
+          --dast-mode="${{ inputs.dast-mode }}" \
+          --workflow-audit="${{ inputs.workflow-audit }}" \
+          --annotations="${{ inputs.annotations }}" \
+          --vortex="${{ inputs.vortex }}" \
+          --vortex-api-url="${{ inputs.vortex-api-url }}" \
+          --vortex-api-key="${{ inputs.vortex-api-key }}" \
           --sbom="${{ inputs.sbom }}" \
           --sbom-format="${{ inputs.sbom-format }}" \
           --sbom-output="${{ inputs.sbom-output }}" \

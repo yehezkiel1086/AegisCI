@@ -1,11 +1,12 @@
 # ==============================================================================
-# AegisCI Runner Image (v2.0)
+# AegisCI Runner Image (v3.0)
 # Pre-packaged with:
 # - Go Runtime & AegisCI CLI Orchestrator
 # - Semgrep (SAST)
 # - Gitleaks (Secrets Detection)
 # - Trivy (SCA & SBOM Generation)
 # - Checkov (IaC & Container Auditing)
+# - Zizmor (CI Workflow Hardening)
 # ==============================================================================
 
 # Stage 1: Build AegisCI binary
@@ -22,7 +23,7 @@ RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o /aegisci ./cmd/aegisci
 FROM python:3.11-slim
 
 LABEL maintainer="AegisCI Team"
-LABEL description="All-in-One DevSecOps Security Orchestrator (v2.0)"
+LABEL description="All-in-One DevSecOps Security Orchestrator (v3.0)"
 
 # Install system dependencies, git, curl, tar
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -42,8 +43,8 @@ RUN TRIVY_VERSION="0.51.0" \
     && curl -sSL "https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}/trivy_${TRIVY_VERSION}_Linux-64bit.tar.gz" | tar -xz -C /usr/local/bin trivy \
     && chmod +x /usr/local/bin/trivy
 
-# Install Semgrep and Checkov via pip
-RUN pip install --no-cache-dir --upgrade semgrep checkov
+# Install Semgrep, Checkov, and Zizmor via pip
+RUN pip install --no-cache-dir --upgrade semgrep checkov zizmor
 
 # Copy AegisCI orchestrator binary
 COPY --from=builder /aegisci /usr/local/bin/aegisci

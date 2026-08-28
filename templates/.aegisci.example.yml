@@ -1,7 +1,7 @@
 # ==============================================================================
-# AegisCI Policy-as-Code Configuration (.aegisci.yml) - v2.0
+# AegisCI Policy-as-Code Configuration (.aegisci.yml) - v3.0
 # ==============================================================================
-version: "2.0"
+version: "3.0"
 
 settings:
   fail_on_unpatched_cves: false # Do not block builds if no vendor patch exists
@@ -30,6 +30,17 @@ ignore:
     reason: "Internal non-HTTP/2 backend service with mitigating upstream proxy"
     expires: "2026-12-31"
 
+  - id: "unpinned-uses"
+    path: ".github/workflows/dev-test.yml"
+    reason: "Development internal action pinned to branch for testing"
+
+# DAST runtime scan configurations
+dast:
+  exclude_paths:
+    - "/logout"
+    - "/admin/reset-db"
+    - "/api/v1/billing/charge"
+
 # License compliance policies for open-source dependencies
 license_policy:
   banned:
@@ -53,3 +64,8 @@ sca:
 # IaC scanning configuration
 iac:
   excluded_frameworks: []
+
+# Vortex Threat Intelligence settings (Opt-in)
+vortex:
+  enabled: false
+  threat_threshold: "HIGH" # NONE, LOW, MEDIUM, HIGH, CRITICAL

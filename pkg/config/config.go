@@ -27,43 +27,62 @@ const (
 	SBOMFormatSPDX      = "spdx-json"
 )
 
+// DAST Modes
+const (
+	DASTModeBaseline = "baseline"
+	DASTModeAPI      = "api"
+	DASTModeFull     = "full"
+)
+
 // Config holds runtime configuration options for the AegisCI orchestrator.
 type Config struct {
-	TargetDir      string `yaml:"target_dir"`
-	OutputFile     string `yaml:"output_file"`
-	Mode           string `yaml:"mode"`
-	FailOnSeverity string `yaml:"fail_on_severity"`
-	EnableSAST     bool   `yaml:"sast"`
-	EnableSecrets  bool   `yaml:"secrets"`
-	EnableSCA      bool   `yaml:"sca"`
-	EnableIaC      bool   `yaml:"iac"`
-	EnableDAST     bool   `yaml:"dast"`
-	DASTTargetURL  string `yaml:"dast_target_url"`
-	GenerateSBOM   bool   `yaml:"sbom"`
-	SBOMFormat     string `yaml:"sbom_format"`
-	SBOMOutput     string `yaml:"sbom_output"`
-	PolicyFile     string `yaml:"policy_file"`
-	Verbose        bool   `yaml:"verbose"`
+	TargetDir           string `yaml:"target_dir"`
+	OutputFile          string `yaml:"output_file"`
+	Mode                string `yaml:"mode"`
+	FailOnSeverity      string `yaml:"fail_on_severity"`
+	EnableSAST          bool   `yaml:"sast"`
+	EnableSecrets       bool   `yaml:"secrets"`
+	EnableSCA           bool   `yaml:"sca"`
+	EnableIaC           bool   `yaml:"iac"`
+	EnableDAST          bool   `yaml:"dast"`
+	DASTTargetURL       string `yaml:"dast_target_url"`
+	DASTMode            string `yaml:"dast_mode"`
+	EnableWorkflowAudit bool   `yaml:"workflow_audit"`
+	EnableAnnotations   bool   `yaml:"annotations"`
+	EnableVortex        bool   `yaml:"vortex"`
+	VortexAPIURL        string `yaml:"vortex_api_url"`
+	VortexAPIKey        string `yaml:"vortex_api_key"`
+	GenerateSBOM        bool   `yaml:"sbom"`
+	SBOMFormat          string `yaml:"sbom_format"`
+	SBOMOutput          string `yaml:"sbom_output"`
+	PolicyFile          string `yaml:"policy_file"`
+	Verbose             bool   `yaml:"verbose"`
 }
 
-// DefaultConfig returns default configuration values for v2.0.
+// DefaultConfig returns default configuration values for v3.0.
 func DefaultConfig() *Config {
 	return &Config{
-		TargetDir:      ".",
-		OutputFile:     "results.sarif",
-		Mode:           ModeAuto,
-		FailOnSeverity: SeverityHigh,
-		EnableSAST:     true,
-		EnableSecrets:  true,
-		EnableSCA:      true, // Enabled by default in v2.0
-		EnableIaC:      true, // Enabled by default in v2.0
-		EnableDAST:     false,
-		DASTTargetURL:  "",
-		GenerateSBOM:   false,
-		SBOMFormat:     SBOMFormatCycloneDX,
-		SBOMOutput:     "sbom.cdx.json",
-		PolicyFile:     ".aegisci.yml",
-		Verbose:        false,
+		TargetDir:           ".",
+		OutputFile:          "results.sarif",
+		Mode:                ModeAuto,
+		FailOnSeverity:      SeverityHigh,
+		EnableSAST:          true,
+		EnableSecrets:       true,
+		EnableSCA:           true,
+		EnableIaC:           true,
+		EnableDAST:          false, // DAST is opt-in when a target URL is provided
+		DASTTargetURL:       "",
+		DASTMode:            DASTModeBaseline,
+		EnableWorkflowAudit: true, // Zizmor workflow linter enabled by default
+		EnableAnnotations:   true, // GitHub Actions PR annotations enabled by default
+		EnableVortex:        false,
+		VortexAPIURL:        "https://api.vortex-threatintel.io/v1",
+		VortexAPIKey:        "",
+		GenerateSBOM:        false,
+		SBOMFormat:          SBOMFormatCycloneDX,
+		SBOMOutput:          "sbom.cdx.json",
+		PolicyFile:          ".aegisci.yml",
+		Verbose:             false,
 	}
 }
 
