@@ -60,6 +60,9 @@ func (a *Aggregator) AddReport(subReport *sarif.Report) {
 		return
 	}
 	for _, run := range subReport.Runs {
+		if run.Results == nil {
+			run.Results = make([]*sarif.Result, 0)
+		}
 		a.masterReport.AddRun(run)
 	}
 }
@@ -85,7 +88,7 @@ func (a *Aggregator) Deduplicate() {
 	seenKeys := make(map[string]bool)
 
 	for _, run := range a.masterReport.Runs {
-		var uniqueResults []*sarif.Result
+		uniqueResults := make([]*sarif.Result, 0)
 		for _, result := range run.Results {
 			key := generateResultDeduplicationKey(result)
 			if !seenKeys[key] {
@@ -127,7 +130,7 @@ func (a *Aggregator) ApplyPolicy(p *policy.Policy) {
 
 	now := time.Now()
 	for _, run := range a.masterReport.Runs {
-		var filteredResults []*sarif.Result
+		filteredResults := make([]*sarif.Result, 0)
 		for _, result := range run.Results {
 			ruleID := ""
 			if result.RuleID != nil {
@@ -162,7 +165,7 @@ func (a *Aggregator) ComputeSummary() *Summary {
 
 	for _, run := range a.masterReport.Runs {
 		engineName := "Unknown"
-		if run.Tool.Driver != nil {
+		if run.Tool.Driver != nil && run.Tool.Driver.Name != "" {
 			engineName = run.Tool.Driver.Name
 		}
 
@@ -261,7 +264,79 @@ func (a *Aggregator) EvaluateGate(p *policy.Policy, failOnSeverity string) (bool
 	return false, ""
 }
 
-// SaveCombined writes the merged SARIF report to the target destination.
+// SanitizeReport ensures the SARIF report strictly satisfies GitHub Code Scanning's schema validator.
+func (a *Aggregator) SanitizeReport() {
+	if a.masterReport == nil {
+		return
+	}
+
+	for _, run := range a.masterReport.Runs {
+		// 1. GitHub Code Scanning requires results to be an array `[]`, NEVER null
+		if run.Results == nil {
+			run.Results = make([]*sarif.Result, 0)
+		}
+
+		// 2. Ensure Tool.Driver is valid
+		if run.Tool.Driver == nil {
+			run.Tool.Driver = sarif.NewDriver("AegisCI")
+		}
+		if run.Tool.Driver.Name == "" {
+			run.Tool.Driver.Name = "AegisCI"
+		}
+
+		// 3. Sanitize driver rules
+		if run.Tool.Driver.Rules != nil {
+			for _, rule := range run.Tool.Driver.Rules {
+				if rule == nil {
+					continue
+				}
+
+				// Ensure ShortDescription is a valid MultiformatMessageString object
+				if rule.ShortDescription != nil && (rule.ShortDescription.Text == nil || *rule.ShortDescription.Text == "") {
+					rule.ShortDescription = sarif.NewMultiformatMessageString(rule.ID)
+				}
+
+				// Ensure FullDescription is valid or nil
+				if rule.FullDescription != nil && (rule.FullDescription.Text == nil || *rule.FullDescription.Text == "") {
+					rule.FullDescription = nil
+				}
+
+				// Ensure Help is valid or nil
+				if rule.Help != nil && (rule.Help.Text == nil || *rule.Help.Text == "") {
+					rule.Help = nil
+				}
+			}
+		}
+
+		// 4. Sanitize results
+		for _, res := range run.Results {
+			if res == nil {
+				continue
+			}
+
+			// Ensure rule ID is present
+			if res.RuleID == nil || *res.RuleID == "" {
+				defaultRuleID := "security-finding"
+				res.RuleID = &defaultRuleID
+			}
+
+			// Ensure message text is present
+			if res.Message.Text == nil || *res.Message.Text == "" {
+				defaultMsg := "Security vulnerability detected"
+				res.Message.Text = &defaultMsg
+			}
+
+			// Ensure level is valid
+			if res.Level == nil || *res.Level == "" {
+				defaultLevel := "warning"
+				res.Level = &defaultLevel
+			}
+		}
+	}
+}
+
+// SaveCombined writes the sanitized merged SARIF report to the target destination.
 func (a *Aggregator) SaveCombined(outputPath string) error {
+	a.SanitizeReport()
 	return a.masterReport.WriteFile(outputPath)
 }

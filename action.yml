@@ -139,7 +139,8 @@ runs:
         if ! command -v gitleaks &> /dev/null; then
           echo "Installing Gitleaks..."
           GITLEAKS_VERSION="8.18.4"
-          curl -sSL "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz" | tar -xz -C /usr/local/bin gitleaks || true
+          curl -sSL "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz" | sudo tar -xz -C /usr/local/bin gitleaks || true
+          sudo chmod +x /usr/local/bin/gitleaks || true
         fi
 
     - name: Install Semgrep
@@ -158,7 +159,8 @@ runs:
         if ! command -v trivy &> /dev/null; then
           echo "Installing Trivy..."
           TRIVY_VERSION="0.51.0"
-          curl -sSL "https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}/trivy_${TRIVY_VERSION}_Linux-64bit.tar.gz" | tar -xz -C /usr/local/bin trivy || true
+          curl -sSL "https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}/trivy_${TRIVY_VERSION}_Linux-64bit.tar.gz" | sudo tar -xz -C /usr/local/bin trivy || true
+          sudo chmod +x /usr/local/bin/trivy || true
         fi
 
     - name: Install Checkov

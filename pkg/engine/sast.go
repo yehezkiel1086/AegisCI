@@ -67,7 +67,6 @@ func (s *SemgrepScanner) Scan(ctx context.Context, targetDir string) (*sarif.Rep
 		"--sarif",
 		"--output=" + tmpFilePath,
 		"--quiet",
-		"--metrics=off",
 		targetDir,
 	}
 
@@ -79,7 +78,7 @@ func (s *SemgrepScanner) Scan(ctx context.Context, targetDir string) (*sarif.Rep
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
 
-	// Execute command. Note: Semgrep may exit with non-zero when findings are found depending on flags.
+	// Execute command. Semgrep returns non-zero exit codes when findings exist.
 	_ = cmd.Run()
 
 	// Check if output SARIF was produced
