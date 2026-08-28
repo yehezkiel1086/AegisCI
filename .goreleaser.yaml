@@ -1,7 +1,5 @@
 # ==============================================================================
 # GoReleaser v2 Configuration for AegisCI
-# Cross-compiles native binaries for Linux, macOS, and Windows.
-# Generates .deb/.rpm Linux packages and publishes Homebrew formula.
 # ==============================================================================
 version: 2
 
@@ -37,10 +35,12 @@ builds:
 
 archives:
   - id: default
-    format: tar.gz
+    formats:
+      - tar.gz
     format_overrides:
       - goos: windows
-        format: zip
+        formats:
+          - zip
     name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
     files:
       - README.md
