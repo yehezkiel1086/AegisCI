@@ -106,7 +106,7 @@ jobs:
         uses: yehezkiel1086/AegisCI@v1
         with:
           mode: 'auto'              # 'pr-check' on PRs, 'deep-scan' on merge
-          fail-on-severity: 'HIGH'  # Blocks build on HIGH or CRITICAL findings
+          fail-on-severity: 'CRITICAL'  # Blocks build on CRITICAL findings
           sbom: 'true'              # Exports CycloneDX SBOM
 ```
 
