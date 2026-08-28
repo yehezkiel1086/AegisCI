@@ -5,8 +5,7 @@
 *.so
 *.dylib
 bin/
-dist/
-aegisci
+dist/aegisci
 
 # Test and coverage artifacts
 *.out

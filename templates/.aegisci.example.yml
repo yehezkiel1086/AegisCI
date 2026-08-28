@@ -1,0 +1,22 @@
+# ==============================================================================
+# AegisCI Security Policy Configuration (.aegisci.yml)
+# ==============================================================================
+version: "1.0"
+
+settings:
+  fail_on_unpatched_cves: false # Do not block builds if no vendor patch exists
+
+# List exceptions/suppressions for accepted risks or false positives
+ignore:
+  - id: "G401" # Rule ID from Semgrep / Gosec
+    path: "pkg/legacy/hash.go"
+    reason: "Non-cryptographic checksum calculation"
+
+  - id: "generic-api-key"
+    path: "test/fixtures/mock_token.env"
+    reason: "Synthetic test fixture with dummy token"
+    expires: "2026-12-31"
+
+  - id: "CVE-2023-99999"
+    reason: "Internal air-gapped service not reachable from public ingress"
+    expires: "2026-12-31"
