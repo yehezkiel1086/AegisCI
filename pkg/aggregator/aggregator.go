@@ -1,6 +1,7 @@
 package aggregator
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"strings"
@@ -264,72 +265,128 @@ func (a *Aggregator) EvaluateGate(p *policy.Policy, failOnSeverity string) (bool
 	return false, ""
 }
 
-// SanitizeReport ensures the SARIF report strictly satisfies GitHub Code Scanning's schema validator.
-func (a *Aggregator) SanitizeReport() {
-	if a.masterReport == nil {
+// sanitizeRulesArray normalizes rules in a tool driver or extension object.
+func sanitizeRulesArray(rules interface{}) []interface{} {
+	rulesList, ok := rules.([]interface{})
+	if !ok {
+		return nil
+	}
+
+	sanitizedRules := make([]interface{}, 0, len(rulesList))
+	for _, r := range rulesList {
+		ruleMap, ok := r.(map[string]interface{})
+		if !ok {
+			continue
+		}
+
+		ruleID := "unknown"
+		if idVal, ok := ruleMap["id"].(string); ok && idVal != "" {
+			ruleID = idVal
+		}
+
+		// Ensure shortDescription is a valid object with required "text" string
+		if shortDesc, exists := ruleMap["shortDescription"]; exists {
+			switch sd := shortDesc.(type) {
+			case string:
+				ruleMap["shortDescription"] = map[string]interface{}{"text": sd}
+			case map[string]interface{}:
+				if textVal, hasText := sd["text"].(string); !hasText || textVal == "" {
+					sd["text"] = ruleID
+				}
+			default:
+				ruleMap["shortDescription"] = map[string]interface{}{"text": ruleID}
+			}
+		} else {
+			ruleMap["shortDescription"] = map[string]interface{}{"text": ruleID}
+		}
+
+		// Ensure fullDescription is valid object or removed
+		if fullDesc, exists := ruleMap["fullDescription"]; exists {
+			switch fd := fullDesc.(type) {
+			case string:
+				ruleMap["fullDescription"] = map[string]interface{}{"text": fd}
+			case map[string]interface{}:
+				if textVal, hasText := fd["text"].(string); !hasText || textVal == "" {
+					delete(ruleMap, "fullDescription")
+				}
+			default:
+				delete(ruleMap, "fullDescription")
+			}
+		}
+
+		// Ensure help is valid object or removed
+		if help, exists := ruleMap["help"]; exists {
+			switch h := help.(type) {
+			case string:
+				ruleMap["help"] = map[string]interface{}{"text": h}
+			case map[string]interface{}:
+				if textVal, hasText := h["text"].(string); !hasText || textVal == "" {
+					delete(ruleMap, "help")
+				}
+			default:
+				delete(ruleMap, "help")
+			}
+		}
+
+		sanitizedRules = append(sanitizedRules, ruleMap)
+	}
+
+	return sanitizedRules
+}
+
+// sanitizeJSONTree walks and sanitizes raw JSON structure to guarantee 100% schema compliance with GitHub Code Scanning.
+func sanitizeJSONTree(root map[string]interface{}) {
+	runsVal, ok := root["runs"].([]interface{})
+	if !ok {
+		root["runs"] = []interface{}{}
 		return
 	}
 
-	for _, run := range a.masterReport.Runs {
-		// 1. GitHub Code Scanning requires results to be an array `[]`, NEVER null
-		if run.Results == nil {
-			run.Results = make([]*sarif.Result, 0)
+	for _, r := range runsVal {
+		runMap, ok := r.(map[string]interface{})
+		if !ok {
+			continue
 		}
 
-		// 2. Ensure Tool.Driver is valid
-		if run.Tool.Driver == nil {
-			run.Tool.Driver = sarif.NewDriver("AegisCI")
-		}
-		if run.Tool.Driver.Name == "" {
-			run.Tool.Driver.Name = "AegisCI"
-		}
-
-		// 3. Sanitize driver rules
-		if run.Tool.Driver.Rules != nil {
-			for _, rule := range run.Tool.Driver.Rules {
-				if rule == nil {
-					continue
-				}
-
-				// Ensure ShortDescription is a valid MultiformatMessageString object
-				if rule.ShortDescription != nil && (rule.ShortDescription.Text == nil || *rule.ShortDescription.Text == "") {
-					rule.ShortDescription = sarif.NewMultiformatMessageString(rule.ID)
-				}
-
-				// Ensure FullDescription is valid or nil
-				if rule.FullDescription != nil && (rule.FullDescription.Text == nil || *rule.FullDescription.Text == "") {
-					rule.FullDescription = nil
-				}
-
-				// Ensure Help is valid or nil
-				if rule.Help != nil && (rule.Help.Text == nil || *rule.Help.Text == "") {
-					rule.Help = nil
+		// 1. results MUST be an array `[]`, NEVER null
+		if resVal, exists := runMap["results"]; !exists || resVal == nil {
+			runMap["results"] = []interface{}{}
+		} else if resList, ok := resVal.([]interface{}); ok {
+			for _, res := range resList {
+				if resMap, ok := res.(map[string]interface{}); ok {
+					// Clean up invalid or overflow sentinel ruleIndex values
+					if ri, hasRI := resMap["ruleIndex"]; hasRI {
+						if num, isNum := ri.(float64); isNum && (num >= 1000000 || num < 0) {
+							delete(resMap, "ruleIndex")
+						}
+					}
 				}
 			}
 		}
 
-		// 4. Sanitize results
-		for _, res := range run.Results {
-			if res == nil {
-				continue
+		// 2. tool driver validation
+		if toolVal, exists := runMap["tool"].(map[string]interface{}); exists {
+			if driverVal, exists := toolVal["driver"].(map[string]interface{}); exists {
+				if nameVal, ok := driverVal["name"].(string); !ok || nameVal == "" {
+					driverVal["name"] = "AegisCI"
+				}
+
+				if rulesVal, exists := driverVal["rules"]; exists && rulesVal != nil {
+					driverVal["rules"] = sanitizeRulesArray(rulesVal)
+				}
+			} else {
+				toolVal["driver"] = map[string]interface{}{"name": "AegisCI"}
 			}
 
-			// Ensure rule ID is present
-			if res.RuleID == nil || *res.RuleID == "" {
-				defaultRuleID := "security-finding"
-				res.RuleID = &defaultRuleID
-			}
-
-			// Ensure message text is present
-			if res.Message.Text == nil || *res.Message.Text == "" {
-				defaultMsg := "Security vulnerability detected"
-				res.Message.Text = &defaultMsg
-			}
-
-			// Ensure level is valid
-			if res.Level == nil || *res.Level == "" {
-				defaultLevel := "warning"
-				res.Level = &defaultLevel
+			// Extensions validation
+			if extVal, exists := toolVal["extensions"].([]interface{}); exists {
+				for _, ext := range extVal {
+					if extMap, ok := ext.(map[string]interface{}); ok {
+						if extRules, exists := extMap["rules"]; exists && extRules != nil {
+							extMap["rules"] = sanitizeRulesArray(extRules)
+						}
+					}
+				}
 			}
 		}
 	}
@@ -337,6 +394,22 @@ func (a *Aggregator) SanitizeReport() {
 
 // SaveCombined writes the sanitized merged SARIF report to the target destination.
 func (a *Aggregator) SaveCombined(outputPath string) error {
-	a.SanitizeReport()
-	return a.masterReport.WriteFile(outputPath)
+	rawBytes, err := json.Marshal(a.masterReport)
+	if err != nil {
+		return fmt.Errorf("failed to marshal master SARIF report: %w", err)
+	}
+
+	var root map[string]interface{}
+	if err := json.Unmarshal(rawBytes, &root); err != nil {
+		return fmt.Errorf("failed to unmarshal SARIF for sanitization: %w", err)
+	}
+
+	sanitizeJSONTree(root)
+
+	finalBytes, err := json.MarshalIndent(root, "", "  ")
+	if err != nil {
+		return fmt.Errorf("failed to re-marshal sanitized SARIF: %w", err)
+	}
+
+	return os.WriteFile(outputPath, finalBytes, 0644)
 }
