@@ -1,0 +1,21 @@
+# Binaries
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+bin/
+dist/
+aegisci
+
+# Test and coverage artifacts
+*.out
+*.test
+results.sarif
+test_results/
+
+# Editor / OS
+.DS_Store
+.idea/
+.vscode/
+*.swp
