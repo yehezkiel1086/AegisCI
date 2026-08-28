@@ -16,12 +16,15 @@ import (
 	"github.com/yehezkiel1086/AegisCI/pkg/config"
 	"github.com/yehezkiel1086/AegisCI/pkg/detector"
 	"github.com/yehezkiel1086/AegisCI/pkg/engine"
+	"github.com/yehezkiel1086/AegisCI/pkg/exporter"
+	"github.com/yehezkiel1086/AegisCI/pkg/plugin"
 	"github.com/yehezkiel1086/AegisCI/pkg/policy"
+	"github.com/yehezkiel1086/AegisCI/pkg/remediation"
 	"github.com/yehezkiel1086/AegisCI/pkg/router"
 	"github.com/yehezkiel1086/AegisCI/pkg/vortex"
 )
 
-const version = "3.0.0"
+const version = "4.0.0"
 
 var (
 	banner = `
@@ -46,8 +49,8 @@ func main() {
 
 	rootCmd := &cobra.Command{
 		Use:   "aegisci",
-		Short: "AegisCI - All-in-One DevSecOps Scanner Orchestrator",
-		Long:  "AegisCI orchestrates SAST, DAST, Secrets, SCA, IaC, and Workflow Linters into a unified SARIF output for GitHub Code Scanning.",
+		Short: "AegisCI - Enterprise DevSecOps Scanner & Security Orchestrator",
+		Long:  "AegisCI orchestrates SAST, DAST, Secrets, SCA, IaC, CI Linters, Custom Plugins, and AI Remediation into a unified SARIF engine.",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runScan(cfg)
 		},
@@ -73,6 +76,16 @@ func main() {
 	rootCmd.Flags().BoolVar(&cfg.GenerateSBOM, "sbom", cfg.GenerateSBOM, "Generate Software Bill of Materials (SBOM)")
 	rootCmd.Flags().StringVar(&cfg.SBOMFormat, "sbom-format", cfg.SBOMFormat, "SBOM format: cyclonedx-json, spdx-json")
 	rootCmd.Flags().StringVar(&cfg.SBOMOutput, "sbom-output", cfg.SBOMOutput, "Output path for SBOM artifact")
+	// v4.0 Enterprise Flags
+	rootCmd.Flags().BoolVar(&cfg.EnableAIRemediation, "ai-remediation", cfg.EnableAIRemediation, "Generate AI-powered code fixes and patches")
+	rootCmd.Flags().StringVar(&cfg.AIProvider, "ai-provider", cfg.AIProvider, "AI Provider: gemini, openai, custom")
+	rootCmd.Flags().StringVar(&cfg.AIAPIKey, "ai-api-key", cfg.AIAPIKey, "API key for AI Remediation provider")
+	rootCmd.Flags().StringVar(&cfg.AIModel, "ai-model", cfg.AIModel, "LLM model name for AI remediation")
+	rootCmd.Flags().StringVar(&cfg.AIBaseURL, "ai-base-url", cfg.AIBaseURL, "Custom LLM API base URL endpoint")
+	rootCmd.Flags().StringVar(&cfg.PatchesDir, "patches-dir", cfg.PatchesDir, "Directory to output AI patch files (.patch)")
+	rootCmd.Flags().StringVar(&cfg.PluginsDir, "plugins-dir", cfg.PluginsDir, "Directory containing custom WASM/binary plugins")
+	rootCmd.Flags().StringVar(&cfg.DashboardURL, "dashboard-url", cfg.DashboardURL, "Centralized Enterprise Dashboard webhook URL")
+	rootCmd.Flags().StringVar(&cfg.DashboardToken, "dashboard-token", cfg.DashboardToken, "Authentication token for Dashboard webhook")
 	rootCmd.Flags().StringVar(&cfg.PolicyFile, "policy-file", cfg.PolicyFile, "Path to .aegisci.yml policy configuration")
 	rootCmd.Flags().BoolVarP(&cfg.Verbose, "verbose", "v", cfg.Verbose, "Enable verbose output")
 
@@ -85,7 +98,7 @@ func main() {
 func runScan(cfg *config.Config) error {
 	// Print Banner
 	cyanBold.Print(banner)
-	whiteBold.Printf(" AegisCI Security Orchestrator v%s (Full-Spectrum DevSecOps Edition)\n", version)
+	whiteBold.Printf(" AegisCI Security Orchestrator v%s (Enterprise DevSecOps Platform)\n", version)
 	gray.Println(" ==========================================================================")
 	fmt.Println()
 
@@ -104,12 +117,12 @@ func runScan(cfg *config.Config) error {
 
 	// 1. Resolve Execution Mode & Pipeline Strategy
 	plan := router.ResolvePlan(cfg)
-	whiteBold.Printf("⚡ [1/6] Smart Mode Routing (Mode: %s)\n", color.CyanString(plan.EffectiveMode))
+	whiteBold.Printf("⚡ [1/7] Smart Mode Routing (Mode: %s)\n", color.CyanString(plan.EffectiveMode))
 	gray.Printf("  • %s\n", plan.Reason)
 	fmt.Println()
 
 	// 2. Stack Detection
-	whiteBold.Println("🔍 [2/6] Inspecting Repository Stack...")
+	whiteBold.Println("🔍 [2/7] Inspecting Repository Stack...")
 	stack, err := detector.Detect(cfg.TargetDir)
 	if err != nil {
 		gray.Printf("  Warning: could not inspect stack: %v\n", err)
@@ -128,9 +141,10 @@ func runScan(cfg *config.Config) error {
 	}
 	fmt.Println()
 
-	// 3. Scanner Orchestration
-	whiteBold.Println("🛠️  [3/6] Initializing Security Engines...")
+	// 3. Scanner Orchestration & Plugin Discovery
+	whiteBold.Println("🛠️  [3/7] Initializing Security Engines & Enterprise Plugins...")
 	var activeScanners []engine.Scanner
+	var engineNames []string
 	var sbomEngine *engine.TrivyScanner
 
 	if plan.EnableSecrets {
@@ -141,6 +155,7 @@ func runScan(cfg *config.Config) error {
 			yellowBold.Printf("  [!] Gitleaks (Secrets Detection)      -> NOT INSTALLED in PATH\n")
 		}
 		activeScanners = append(activeScanners, gitleaks)
+		engineNames = append(engineNames, gitleaks.Name())
 	}
 
 	if plan.EnableSAST {
@@ -151,6 +166,7 @@ func runScan(cfg *config.Config) error {
 			yellowBold.Printf("  [!] Semgrep  (SAST Static Code)       -> NOT INSTALLED in PATH\n")
 		}
 		activeScanners = append(activeScanners, semgrep)
+		engineNames = append(engineNames, semgrep.Name())
 	}
 
 	if plan.EnableSCA {
@@ -162,6 +178,7 @@ func runScan(cfg *config.Config) error {
 			yellowBold.Printf("  [!] Trivy    (SCA & Dependencies)     -> NOT INSTALLED in PATH\n")
 		}
 		activeScanners = append(activeScanners, trivy)
+		engineNames = append(engineNames, trivy.Name())
 	}
 
 	if plan.EnableIaC {
@@ -172,6 +189,7 @@ func runScan(cfg *config.Config) error {
 			yellowBold.Printf("  [!] Checkov  (IaC & Containers)       -> NOT INSTALLED in PATH\n")
 		}
 		activeScanners = append(activeScanners, checkov)
+		engineNames = append(engineNames, checkov.Name())
 	}
 
 	if plan.EnableWorkflowAudit && stack.HasWorkflows {
@@ -182,6 +200,7 @@ func runScan(cfg *config.Config) error {
 			yellowBold.Printf("  [!] Zizmor   (CI Workflow Hardening)  -> NOT INSTALLED in PATH\n")
 		}
 		activeScanners = append(activeScanners, zizmor)
+		engineNames = append(engineNames, zizmor.Name())
 	}
 
 	if plan.EnableDAST && plan.DASTTargetURL != "" {
@@ -192,6 +211,17 @@ func runScan(cfg *config.Config) error {
 			yellowBold.Printf("  [!] OWASP ZAP (DAST Runtime)          -> RUNNER NOT INSTALLED in PATH\n")
 		}
 		activeScanners = append(activeScanners, zapScanner)
+		engineNames = append(engineNames, zapScanner.Name())
+	}
+
+	// Discover Custom Enterprise Plugins
+	discoveredPlugins, err := plugin.DiscoverPlugins(cfg.PluginsDir)
+	if err == nil && len(discoveredPlugins) > 0 {
+		for _, p := range discoveredPlugins {
+			greenBold.Printf("  [✓] Plugin: %-25s (v%s) -> LOADED\n", p.Name(), p.Version())
+			activeScanners = append(activeScanners, plugin.AsScanner(p))
+			engineNames = append(engineNames, p.Name())
+		}
 	}
 
 	if len(activeScanners) == 0 {
@@ -200,7 +230,7 @@ func runScan(cfg *config.Config) error {
 	fmt.Println()
 
 	// 4. Execution
-	whiteBold.Println("🚀 [4/6] Executing Parallel Security Scanners...")
+	whiteBold.Println("🚀 [4/7] Executing Parallel Security Engines & Plugins...")
 	orchestrator := engine.NewOrchestrator(activeScanners...)
 	results := orchestrator.Run(ctx, cfg.TargetDir)
 
@@ -250,7 +280,7 @@ func runScan(cfg *config.Config) error {
 	fmt.Println()
 
 	// 5. Aggregation, Deduplication & Policy-as-Code Evaluation
-	whiteBold.Println("🛡️  [5/6] Aggregating Findings & Evaluating Policy-as-Code...")
+	whiteBold.Println("🛡️  [5/7] Aggregating Findings & Evaluating Policy-as-Code...")
 	agg.Deduplicate()
 
 	pol, polErr := policy.LoadPolicy(cfg.PolicyFile)
@@ -269,23 +299,53 @@ func runScan(cfg *config.Config) error {
 
 	// Summary Table
 	summary := agg.ComputeSummary()
-	printSummaryTable(summary, time.Since(startTime), cfg.FailOnSeverity, plan.EffectiveMode)
+	elapsed := time.Since(startTime)
+	printSummaryTable(summary, elapsed, cfg.FailOnSeverity, plan.EffectiveMode)
 
-	// 6. Inline PR Annotations
+	// 6. AI Remediation Engine (v4.0)
+	if cfg.EnableAIRemediation && len(summary.Findings) > 0 {
+		fmt.Println()
+		whiteBold.Printf("🤖 [6/7] Generating AI Remediation Fixes (%s)...\n", color.CyanString(cfg.AIProvider))
+		aiEngine := remediation.NewEngine(cfg.AIProvider, cfg.AIAPIKey, cfg.AIModel, cfg.AIBaseURL)
+		suggestions, err := aiEngine.GenerateRemediations(ctx, summary.Findings, cfg.TargetDir)
+		if err != nil {
+			gray.Printf("  Warning: AI remediation generation encountered an issue: %v\n", err)
+		} else if len(suggestions) > 0 {
+			if err := remediation.SavePatches(suggestions, cfg.PatchesDir); err != nil {
+				redBold.Printf("  ✗ Failed to write patch files: %v\n", err)
+			} else {
+				greenBold.Printf("  ✓ Generated %d code fix patch(es) in %s/\n", len(suggestions), color.WhiteString(cfg.PatchesDir))
+			}
+		}
+	}
+
+	// 7. Inline PR Annotations
 	if cfg.EnableAnnotations && len(summary.Findings) > 0 {
-		whiteBold.Println("\n📝 [6/6] Emitting Inline GitHub PR Annotations...")
+		whiteBold.Println("\n📝 [7/7] Emitting Inline GitHub PR Annotations...")
 		emitter := annotations.NewEmitter(os.Stdout)
 		emitter.Emit(summary)
 	}
 
-	// Gate Evaluation
+	// Evaluate Gate
 	shouldFail, failReason := agg.EvaluateGate(pol, cfg.FailOnSeverity)
+
+	// Centralized Enterprise Dashboard Telemetry Exporter
+	if cfg.DashboardURL != "" {
+		exporterClient := exporter.NewExporter(cfg.DashboardURL, cfg.DashboardToken)
+		payload := exporter.BuildPayload(summary, elapsed, plan.EffectiveMode, cfg.FailOnSeverity, !shouldFail, engineNames)
+		if err := exporterClient.Export(ctx, payload); err != nil {
+			gray.Printf("\n  Warning: could not dispatch telemetry to dashboard: %v\n", err)
+		} else {
+			greenBold.Printf("\n  ✓ Scan telemetry successfully streamed to enterprise dashboard (%s)\n", cfg.DashboardURL)
+		}
+	}
+
 	if shouldFail {
 		redBold.Printf("\n❌ Build Failed: %s\n", failReason)
 		os.Exit(1)
 	}
 
-	greenBold.Println("\n✅ Audit Passed: All policy checks and security gates satisfied.")
+	greenBold.Println("\n✅ Audit Passed: All enterprise policy checks and security gates satisfied.")
 	return nil
 }
 

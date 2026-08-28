@@ -1,7 +1,7 @@
 # ==============================================================================
-# AegisCI Policy-as-Code Configuration (.aegisci.yml) - v3.0
+# AegisCI Policy-as-Code Configuration (.aegisci.yml) - v4.0 Enterprise
 # ==============================================================================
-version: "3.0"
+version: "4.0"
 
 settings:
   fail_on_unpatched_cves: false # Do not block builds if no vendor patch exists
@@ -65,7 +65,20 @@ sca:
 iac:
   excluded_frameworks: []
 
-# Vortex Threat Intelligence settings (Opt-in)
-vortex:
+# Enterprise v4.0 Plugin settings
+plugins:
+  directory: ".aegisci/plugins"
+  enabled: true
+
+# Enterprise AI Remediation settings
+ai_remediation:
+  enabled: true
+  provider: "gemini" # gemini, openai, custom
+  model: "gemini-1.5-pro"
+  patches_dir: "patches"
+
+# Enterprise Centralized Dashboard Telemetry
+dashboard:
   enabled: false
-  threat_threshold: "HIGH" # NONE, LOW, MEDIUM, HIGH, CRITICAL
+  endpoint: "https://security-dashboard.enterprise.internal/api/v1/telemetry"
+  token_env_var: "AEGISCI_DASHBOARD_TOKEN"

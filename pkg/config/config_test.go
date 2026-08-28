@@ -49,12 +49,15 @@ func TestSeverityRank(t *testing.T) {
 func TestDefaultConfig(t *testing.T) {
 	cfg := DefaultConfig()
 	if !cfg.EnableSAST || !cfg.EnableSecrets || !cfg.EnableSCA || !cfg.EnableIaC || !cfg.EnableWorkflowAudit {
-		t.Errorf("Expected default v3.0 config to enable SAST, Secrets, SCA, IaC, and WorkflowAudit")
+		t.Errorf("Expected default v4.0 config to enable SAST, Secrets, SCA, IaC, and WorkflowAudit")
 	}
 	if !cfg.EnableAnnotations {
 		t.Errorf("Expected default EnableAnnotations to be true")
 	}
-	if cfg.DASTMode != DASTModeBaseline {
-		t.Errorf("Expected default DAST mode to be baseline, got %s", cfg.DASTMode)
+	if cfg.PluginsDir != ".aegisci/plugins" {
+		t.Errorf("Expected default PluginsDir to be .aegisci/plugins, got %s", cfg.PluginsDir)
+	}
+	if cfg.PatchesDir != "patches" {
+		t.Errorf("Expected default PatchesDir to be patches, got %s", cfg.PatchesDir)
 	}
 }

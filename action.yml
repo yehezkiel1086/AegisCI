@@ -1,5 +1,5 @@
 name: 'AegisCI Security Orchestrator'
-description: 'All-in-One DevSecOps Scanner & Security Orchestrator for GitHub Actions (SAST, DAST, Secrets, SCA, IaC, Workflow Linters).'
+description: 'All-in-One DevSecOps Scanner & Enterprise Security Orchestrator (SAST, DAST, Secrets, SCA, IaC, CI Linters, AI Remediation, Plugins).'
 author: 'AegisCI'
 branding:
   icon: 'shield'
@@ -50,6 +50,30 @@ inputs:
     description: 'Emit inline PR code annotations via GitHub Actions workflow commands'
     required: false
     default: 'true'
+  ai-remediation:
+    description: 'Generate AI-powered code fix patches (.patch)'
+    required: false
+    default: 'false'
+  ai-api-key:
+    description: 'API key for AI remediation provider (Gemini / OpenAI)'
+    required: false
+    default: ''
+  ai-provider:
+    description: 'AI provider for remediation: gemini, openai, custom'
+    required: false
+    default: 'gemini'
+  plugins-dir:
+    description: 'Directory path containing custom executable plugins'
+    required: false
+    default: '.aegisci/plugins'
+  dashboard-url:
+    description: 'Centralized Enterprise Dashboard webhook URL'
+    required: false
+    default: ''
+  dashboard-token:
+    description: 'Authentication token for Enterprise Dashboard webhook'
+    required: false
+    default: ''
   vortex:
     description: 'Enable Vortex Threat Intelligence feed queries'
     required: false
@@ -178,6 +202,12 @@ runs:
           --dast-mode="${{ inputs.dast-mode }}" \
           --workflow-audit="${{ inputs.workflow-audit }}" \
           --annotations="${{ inputs.annotations }}" \
+          --ai-remediation="${{ inputs.ai-remediation }}" \
+          --ai-api-key="${{ inputs.ai-api-key }}" \
+          --ai-provider="${{ inputs.ai-provider }}" \
+          --plugins-dir="${{ inputs.plugins-dir }}" \
+          --dashboard-url="${{ inputs.dashboard-url }}" \
+          --dashboard-token="${{ inputs.dashboard-token }}" \
           --vortex="${{ inputs.vortex }}" \
           --vortex-api-url="${{ inputs.vortex-api-url }}" \
           --vortex-api-key="${{ inputs.vortex-api-key }}" \

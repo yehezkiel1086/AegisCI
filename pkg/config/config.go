@@ -34,6 +34,13 @@ const (
 	DASTModeFull     = "full"
 )
 
+// AI Providers
+const (
+	AIProviderGemini = "gemini"
+	AIProviderOpenAI = "openai"
+	AIProviderCustom = "custom"
+)
+
 // Config holds runtime configuration options for the AegisCI orchestrator.
 type Config struct {
 	TargetDir           string `yaml:"target_dir"`
@@ -55,11 +62,22 @@ type Config struct {
 	GenerateSBOM        bool   `yaml:"sbom"`
 	SBOMFormat          string `yaml:"sbom_format"`
 	SBOMOutput          string `yaml:"sbom_output"`
+	// v4.0 Enterprise Extensions
+	EnableAIRemediation bool   `yaml:"ai_remediation"`
+	AIProvider          string `yaml:"ai_provider"`
+	AIAPIKey            string `yaml:"ai_api_key"`
+	AIModel             string `yaml:"ai_model"`
+	AIBaseURL           string `yaml:"ai_base_url"`
+	PatchesDir          string `yaml:"patches_dir"`
+	PluginsDir          string `yaml:"plugins_dir"`
+	DashboardURL        string `yaml:"dashboard_url"`
+	DashboardToken      string `yaml:"dashboard_token"`
+	ExportMetrics       bool   `yaml:"export_metrics"`
 	PolicyFile          string `yaml:"policy_file"`
 	Verbose             bool   `yaml:"verbose"`
 }
 
-// DefaultConfig returns default configuration values for v3.0.
+// DefaultConfig returns default configuration values for v4.0.
 func DefaultConfig() *Config {
 	return &Config{
 		TargetDir:           ".",
@@ -70,17 +88,28 @@ func DefaultConfig() *Config {
 		EnableSecrets:       true,
 		EnableSCA:           true,
 		EnableIaC:           true,
-		EnableDAST:          false, // DAST is opt-in when a target URL is provided
+		EnableDAST:          false,
 		DASTTargetURL:       "",
 		DASTMode:            DASTModeBaseline,
-		EnableWorkflowAudit: true, // Zizmor workflow linter enabled by default
-		EnableAnnotations:   true, // GitHub Actions PR annotations enabled by default
+		EnableWorkflowAudit: true,
+		EnableAnnotations:   true,
 		EnableVortex:        false,
 		VortexAPIURL:        "https://api.vortex-threatintel.io/v1",
 		VortexAPIKey:        "",
 		GenerateSBOM:        false,
 		SBOMFormat:          SBOMFormatCycloneDX,
 		SBOMOutput:          "sbom.cdx.json",
+		// v4.0 Defaults
+		EnableAIRemediation: false,
+		AIProvider:          AIProviderGemini,
+		AIAPIKey:            "",
+		AIModel:             "gemini-1.5-pro",
+		AIBaseURL:           "",
+		PatchesDir:          "patches",
+		PluginsDir:          ".aegisci/plugins",
+		DashboardURL:        "",
+		DashboardToken:      "",
+		ExportMetrics:       false,
 		PolicyFile:          ".aegisci.yml",
 		Verbose:             false,
 	}
