@@ -188,7 +188,7 @@ runs:
     - name: Run AegisCI Security Suite
       shell: bash
       run: |
-        /tmp/aegisci \
+        /tmp/aegisci scan \
           --target="${{ inputs.target }}" \
           --output="${{ inputs.output }}" \
           --mode="${{ inputs.mode }}" \

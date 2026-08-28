@@ -53,4 +53,4 @@ RUN chmod +x /usr/local/bin/aegisci
 WORKDIR /workspace
 
 ENTRYPOINT ["aegisci"]
-CMD ["--target", "/workspace"]
+CMD ["scan", "--target", "/workspace"]

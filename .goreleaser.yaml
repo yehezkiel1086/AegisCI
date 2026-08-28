@@ -1,0 +1,99 @@
+# ==============================================================================
+# GoReleaser v2 Configuration for AegisCI
+# Cross-compiles native binaries for Linux, macOS, and Windows.
+# Generates .deb/.rpm Linux packages and publishes Homebrew formula.
+# ==============================================================================
+version: 2
+
+project_name: aegisci
+
+before:
+  hooks:
+    - go mod tidy
+    - go mod verify
+
+builds:
+  - id: aegisci
+    main: ./cmd/aegisci
+    binary: aegisci
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    ignore:
+      - goos: windows
+        goarch: arm64
+    ldflags:
+      - -s -w
+      - -X github.com/yehezkiel1086/AegisCI/pkg/cli.Version={{ .Version }}
+      - -X github.com/yehezkiel1086/AegisCI/pkg/cli.Commit={{ .Commit }}
+      - -X github.com/yehezkiel1086/AegisCI/pkg/cli.Date={{ .Date }}
+      - -X github.com/yehezkiel1086/AegisCI/pkg/cli.BuiltBy=goreleaser
+
+archives:
+  - id: default
+    format: tar.gz
+    format_overrides:
+      - goos: windows
+        format: zip
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    files:
+      - README.md
+      - LICENSE*
+      - docs/**
+      - templates/**
+
+checksum:
+  name_template: "checksums.txt"
+  algorithm: sha256
+
+nfpms:
+  - id: packages
+    package_name: aegisci
+    vendor: "AegisCI Security"
+    homepage: "https://github.com/yehezkiel1086/AegisCI"
+    maintainer: "Yehezkiel <security@aegisci.dev>"
+    description: "All-in-One DevSecOps Scanner & Security Orchestrator"
+    license: "MIT"
+    formats:
+      - deb
+      - rpm
+    file_name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    bindir: /usr/local/bin
+    section: utils
+    priority: optional
+
+brews:
+  - name: aegisci
+    repository:
+      owner: yehezkiel1086
+      name: homebrew-tap
+      branch: main
+      token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
+    commit_author:
+      name: aegisci-bot
+      email: bot@aegisci.dev
+    commit_msg_template: "Brew formula update for {{ .ProjectName }} version {{ .Tag }}"
+    directory: Formula
+    homepage: "https://github.com/yehezkiel1086/AegisCI"
+    description: "All-in-One DevSecOps Scanner & Security Orchestrator for GitHub Actions and CLI"
+    license: "MIT"
+    install: |
+      bin.install "aegisci"
+    test: |
+      system "#{bin}/aegisci version"
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+      - "^chore:"
+      - "Merge pull request"
+      - "Merge branch"

@@ -1,38 +1,46 @@
 # 📖 AegisCI — Complete "How to Use" Guide
 
-> **All-in-One DevSecOps Scanner, Policy-as-Code Engine & Security Orchestrator for GitHub Actions and Local CI/CD.**
+> **All-in-One DevSecOps Scanner, Policy-as-Code Engine & Security Orchestrator for GitHub Actions and Standalone Terminals.**
 
 ---
 
 ## 📑 Table of Contents
 
 1. [Overview](#1-overview)
-2. [Quickstart in GitHub Actions](#2-quickstart-in-github-actions)
-3. [Local CLI Installation & Usage](#3-local-cli-installation--usage)
-4. [Docker Container Usage](#4-docker-container-usage)
-5. [Pipeline Modes (`auto`, `pr-check`, `deep-scan`)](#5-pipeline-modes)
-6. [Security Pillars Configuration](#6-security-pillars-configuration)
+2. [Installation Guide](#2-installation-guide)
+   - [macOS & Linux via Homebrew](#macos--linux-via-homebrew)
+   - [Debian / Ubuntu via APT / .deb](#debian--ubuntu-deb)
+   - [Fedora / RHEL / CentOS via RPM](#fedora--rhel--centos-rpm)
+   - [Go Developers via `go install`](#go-developers-go-install)
+   - [Direct Standalone Binary Downloads](#direct-binary-download)
+3. [Quickstart in GitHub Actions](#3-quickstart-in-github-actions)
+4. [CLI Commands & Subcommands](#4-cli-commands--subcommands)
+   - [`aegisci scan`](#aegisci-scan)
+   - [`aegisci version`](#aegisci-version)
+5. [Docker Container Usage](#5-docker-container-usage)
+6. [Pipeline Modes (`auto`, `pr-check`, `deep-scan`)](#6-pipeline-modes)
+7. [Security Pillars Configuration](#7-security-pillars-configuration)
    - [Secrets Detection (Gitleaks)](#secrets-detection-gitleaks)
    - [Static Application Security Testing (Semgrep)](#sast-semgrep)
    - [Software Composition Analysis & SBOM (Trivy)](#sca--sbom-trivy)
    - [Infrastructure-as-Code (Checkov)](#iac--container-auditing-checkov)
    - [Dynamic Application Security Testing (OWASP ZAP)](#dast-runtime-testing-owasp-zap)
    - [CI Workflow Hardening (Zizmor)](#ci-workflow-hardening-zizmor)
-7. [Policy-as-Code Configuration (`.aegisci.yml`)](#7-policy-as-code-configuration-aegisciyml)
-8. [Enterprise Features (v4.0)](#8-enterprise-features-v40)
+8. [Policy-as-Code Configuration (`.aegisci.yml`)](#8-policy-as-code-configuration-aegisciyml)
+9. [Enterprise Features (v4.0)](#9-enterprise-features-v40)
    - [Writing Custom Plugins (`.aegisci/plugins/`)](#custom-plugins-sdk)
    - [AI Remediation & Patch Generation](#ai-remediation--patch-generation)
    - [Enterprise Dashboard Telemetry Streamer](#enterprise-dashboard-telemetry)
    - [Vortex Threat Intelligence Integration](#vortex-threat-intelligence)
-9. [Complete GitHub Actions Workflow Examples](#9-complete-github-actions-workflow-examples)
-10. [CLI Flags & Parameter Reference](#10-cli-flags--parameter-reference)
-11. [Troubleshooting & FAQ](#11-troubleshooting--faq)
+10. [Complete GitHub Actions Workflow Recipes](#10-complete-github-actions-workflow-recipes)
+11. [CLI Flags & Parameter Reference](#11-cli-flags--parameter-reference)
+12. [Troubleshooting & FAQ](#12-troubleshooting--faq)
 
 ---
 
 ## 1. Overview
 
-AegisCI replaces fragmented security scanning workflows by consolidating **6 security pillars** into a single high-performance orchestrator:
+AegisCI replaces fragmented security scanning workflows by consolidating **6 security pillars** into a single high-performance standalone terminal binary and GitHub Action:
 - **Secrets Detection**: Gitleaks
 - **SAST**: Semgrep
 - **SCA & SBOM**: Trivy (CycloneDX / SPDX)
@@ -45,7 +53,47 @@ All findings are deduplicated and merged into a **single unified SARIF v2.1.0 re
 
 ---
 
-## 2. Quickstart in GitHub Actions
+## 2. Installation Guide
+
+`aegisci` is cross-compiled across Linux (x86_64, ARM64), macOS (Apple Silicon, Intel), and Windows.
+
+### macOS & Linux (via Homebrew)
+```bash
+# Add Homebrew tap and install
+brew tap yehezkiel1086/tap
+brew install aegisci
+
+# Verify installation
+aegisci version
+```
+
+### Debian / Ubuntu (`.deb`)
+```bash
+curl -sLO https://github.com/yehezkiel1086/AegisCI/releases/latest/download/aegisci_linux_amd64.deb
+sudo dpkg -i aegisci_linux_amd64.deb
+```
+
+### Fedora / RHEL / CentOS (`.rpm`)
+```bash
+sudo rpm -ivh https://github.com/yehezkiel1086/AegisCI/releases/latest/download/aegisci_linux_amd64.rpm
+```
+
+### Go Developers (`go install`)
+```bash
+go install github.com/yehezkiel1086/AegisCI/cmd/aegisci@latest
+```
+
+### Direct Binary Download
+Download pre-built standalone binaries from the [GitHub Releases Page](https://github.com/yehezkiel1086/AegisCI/releases):
+- **Linux (x86_64 / ARM64):** `aegisci_<version>_linux_amd64.tar.gz`
+- **macOS (Apple Silicon / Intel):** `aegisci_<version>_darwin_arm64.tar.gz`
+- **Windows (x86_64):** `aegisci_<version>_windows_amd64.zip`
+
+Extract the archive and move the binary to `/usr/local/bin` (or your Windows PATH).
+
+---
+
+## 3. Quickstart in GitHub Actions
 
 Add AegisCI to your repository in `.github/workflows/security.yml`:
 
@@ -65,7 +113,7 @@ jobs:
     permissions:
       contents: read
       security-events: write # Required for GitHub Code Scanning tab upload
-      pull-requests: write   # Optional: For PR annotations and comments
+      pull-requests: write   # For inline PR annotations
 
     steps:
       - name: Checkout Repository
@@ -83,52 +131,53 @@ jobs:
 
 ---
 
-## 3. Local CLI Installation & Usage
+## 4. CLI Commands & Subcommands
 
-### Building from Source
-
-Ensure you have **Go 1.22+** installed:
-
-```bash
-# Clone the repository
-git clone https://github.com/yehezkiel1086/AegisCI.git
-cd AegisCI
-
-# Build the aegisci executable
-go build -o bin/aegisci ./cmd/aegisci
-```
-
-### Running Scans Locally
+### `aegisci scan`
+The primary command to execute security scans:
 
 ```bash
 # Basic scan against current directory
-./bin/aegisci --target .
+aegisci scan --target .
 
 # Run fast PR-Check mode
-./bin/aegisci --target . --mode pr-check
+aegisci scan --target . --mode pr-check
 
 # Run full deep scan with SBOM generation
-./bin/aegisci --target . --mode deep-scan --sbom --sbom-format cyclonedx-json --sbom-output sbom.cdx.json
+aegisci scan --target . --mode deep-scan --sbom --sbom-format cyclonedx-json --sbom-output sbom.cdx.json
 
 # Fail only on CRITICAL findings
-./bin/aegisci --target . --fail-on-severity CRITICAL
+aegisci scan --target . --fail-on CRITICAL
 
 # Target a live staging environment with DAST
-./bin/aegisci --target . --dast --dast-target-url https://staging.example.com
+aegisci scan --target . --dast --dast-target-url https://staging.example.com
+```
+
+### `aegisci version`
+Prints version number, git commit SHA, build timestamp, and runtime architecture:
+
+```bash
+$ aegisci version
+aegisci version 4.0.0
+  commit:     e5f8a92
+  built at:   2026-08-28T12:00:00Z
+  built by:   goreleaser
+  os/arch:    linux/amd64
+  go version: go1.26.0
 ```
 
 ---
 
-## 4. Docker Container Usage
+## 5. Docker Container Usage
 
-AegisCI comes with a multi-stage `Dockerfile` containing pre-installed scanning engines (`gitleaks`, `semgrep`, `trivy`, `checkov`, `zizmor`):
+AegisCI comes with a pre-packaged multi-stage `Dockerfile`:
 
 ```bash
 # Build the Docker image
 docker build -t aegisci:latest .
 
 # Run against a local repository mounted to /workspace
-docker run --rm -v $(pwd):/workspace aegisci:latest \
+docker run --rm -v $(pwd):/workspace aegisci:latest scan \
   --target /workspace \
   --output /workspace/results.sarif \
   --mode auto
@@ -136,7 +185,7 @@ docker run --rm -v $(pwd):/workspace aegisci:latest \
 
 ---
 
-## 5. Pipeline Modes
+## 6. Pipeline Modes
 
 AegisCI dynamically routes scan execution to optimize developer velocity without compromising release security:
 
@@ -148,7 +197,7 @@ AegisCI dynamically routes scan execution to optimize developer velocity without
 
 ---
 
-## 6. Security Pillars Configuration
+## 7. Security Pillars Configuration
 
 Each security scanner can be individually toggled via CLI flags or GitHub Action inputs:
 
@@ -165,7 +214,7 @@ Each security scanner can be individually toggled via CLI flags or GitHub Action
 - **What it scans**: Vulnerabilities across dependencies (`go.mod`, `package-lock.json`, `requirements.txt`, `Cargo.lock`, `pom.xml`, etc.).
 - **SBOM Generation**:
   ```bash
-  ./aegisci --sbom --sbom-format cyclonedx-json --sbom-output sbom.json
+  aegisci scan --sbom --sbom-format cyclonedx-json --sbom-output sbom.json
   ```
 
 ### IaC & Container Auditing (Checkov)
@@ -177,7 +226,7 @@ Each security scanner can be individually toggled via CLI flags or GitHub Action
 - **Automated Health Probing**: Automatically pings the target URL before scanning. If the endpoint is down or unreachable, it reports a clear diagnostic message instead of hanging.
 - **Example**:
   ```bash
-  ./aegisci --dast --dast-target-url http://localhost:8080 --dast-mode baseline
+  aegisci scan --dast --dast-target-url http://localhost:8080 --dast-mode baseline
   ```
 
 ### CI Workflow Hardening (Zizmor)
@@ -186,7 +235,7 @@ Each security scanner can be individually toggled via CLI flags or GitHub Action
 
 ---
 
-## 7. Policy-as-Code Configuration (`.aegisci.yml`)
+## 8. Policy-as-Code Configuration (`.aegisci.yml`)
 
 Add a `.aegisci.yml` file to the root of your repository to manage exemptions, tolerances, and compliance rules:
 
@@ -239,7 +288,7 @@ license_policy:
 
 ---
 
-## 8. Enterprise Features (v4.0)
+## 9. Enterprise Features (v4.0)
 
 ### Custom Plugins SDK
 Place custom scripts or binaries in `.aegisci/plugins/` (or specify `--plugins-dir`):
@@ -252,7 +301,7 @@ AegisCI can automatically analyze vulnerabilities and generate git patch files:
 - **Output**: Generates `.patch` files (e.g. `patches/patch-01-sql-injection.patch`) and a markdown guide in `patches/remediations.md`.
 
 ```bash
-./aegisci --ai-remediation --ai-provider gemini --ai-api-key $GEMINI_API_KEY
+aegisci scan --ai-remediation --ai-provider gemini --ai-api-key $GEMINI_API_KEY
 ```
 
 ### Enterprise Dashboard Telemetry
@@ -266,9 +315,9 @@ Query Vortex Threat Feeds during scan execution:
 
 ---
 
-## 9. Complete GitHub Actions Workflow Examples
+## 10. Complete GitHub Actions Workflow Recipes
 
-### Example 1: Full Security Pipeline with PR Gate & AI Remediation
+### Recipe 1: Full Security Pipeline with PR Gate & AI Remediation
 
 ```yaml
 name: Security Pipeline
@@ -319,7 +368,7 @@ jobs:
           path: patches/
 ```
 
-### Example 2: Scheduled Nightly Deep Scan with DAST & Dashboard Reporting
+### Recipe 2: Scheduled Nightly Deep Scan with DAST & Dashboard Reporting
 
 ```yaml
 name: Nightly Deep Security Audit
@@ -358,39 +407,39 @@ jobs:
 
 ---
 
-## 10. CLI Flags & Parameter Reference
+## 11. CLI Flags & Parameter Reference
 
-| Flag / Input | Default | Allowed Values | Description |
-| :--- | :--- | :--- | :--- |
-| `-t, --target` | `.` | Directory Path | Target directory or repository root to scan |
-| `-o, --output` | `results.sarif` | File Path | Destination path for unified SARIF report |
-| `-m, --mode` | `auto` | `auto`, `pr-check`, `deep-scan` | Pipeline depth mode |
-| `-f, --fail-on-severity` | `HIGH` | `NONE`, `LOW`, `MEDIUM`, `HIGH`, `CRITICAL` | Severity threshold to fail the build |
-| `--sast` | `true` | `true`, `false` | Enable/Disable Semgrep SAST engine |
-| `--secrets` | `true` | `true`, `false` | Enable/Disable Gitleaks Secrets engine |
-| `--sca` | `true` | `true`, `false` | Enable/Disable Trivy SCA engine |
-| `--iac` | `true` | `true`, `false` | Enable/Disable Checkov IaC engine |
-| `--workflow-audit` | `true` | `true`, `false` | Enable/Disable Zizmor workflow linter |
-| `--dast` | `false` | `true`, `false` | Enable/Disable OWASP ZAP DAST engine |
-| `--dast-target-url` | `""` | URL (`http://...`) | Web endpoint for DAST scanning |
-| `--dast-mode` | `baseline` | `baseline`, `api`, `full` | DAST scan depth profile |
-| `--annotations` | `true` | `true`, `false` | Emit inline GitHub Actions PR annotations |
-| `--sbom` | `false` | `true`, `false` | Generate Software Bill of Materials (SBOM) |
-| `--sbom-format` | `cyclonedx-json` | `cyclonedx-json`, `spdx-json` | Format for SBOM export |
-| `--sbom-output` | `sbom.cdx.json` | File Path | Output destination for SBOM file |
-| `--ai-remediation` | `false` | `true`, `false` | Generate AI-powered code fix patches |
-| `--ai-provider` | `gemini` | `gemini`, `openai`, `custom` | AI Remediation LLM provider |
-| `--ai-api-key` | `""` | String | API key for AI provider |
-| `--patches-dir` | `patches` | Directory Path | Directory for generated `.patch` files |
-| `--plugins-dir` | `.aegisci/plugins` | Directory Path | Directory for custom scanner plugins |
-| `--dashboard-url` | `""` | Webhook URL | Enterprise dashboard telemetry endpoint |
-| `--dashboard-token`| `""` | String | Bearer authentication token for dashboard |
-| `--policy-file` | `.aegisci.yml` | File Path | Path to policy-as-code YAML file |
-| `-v, --verbose` | `false` | `true`, `false` | Enable verbose terminal output |
+| Flag | Short | Default | Allowed Values | Description |
+| :--- | :--- | :--- | :--- | :--- |
+| `--target` | `-t` | `.` | Directory Path | Target directory or repository root to scan |
+| `--output` | `-o` | `results.sarif` | File Path | Destination path for unified SARIF report |
+| `--mode` | `-m` | `auto` | `auto`, `pr-check`, `deep-scan` | Pipeline depth mode |
+| `--fail-on` / `--fail-on-severity` | `-f` | `HIGH` | `NONE`, `LOW`, `MEDIUM`, `HIGH`, `CRITICAL` | Severity threshold to fail the build |
+| `--config` / `--policy-file` | `-c` | `.aegisci.yml` | File Path | Path to policy-as-code YAML file |
+| `--sast` | | `true` | `true`, `false` | Enable/Disable Semgrep SAST engine |
+| `--secrets` | | `true` | `true`, `false` | Enable/Disable Gitleaks Secrets engine |
+| `--sca` | | `true` | `true`, `false` | Enable/Disable Trivy SCA engine |
+| `--iac` | | `true` | `true`, `false` | Enable/Disable Checkov IaC engine |
+| `--workflow-audit` | | `true` | `true`, `false` | Enable/Disable Zizmor workflow linter |
+| `--dast` | | `false` | `true`, `false` | Enable/Disable OWASP ZAP DAST engine |
+| `--dast-target-url` | | `""` | URL (`http://...`) | Web endpoint for DAST scanning |
+| `--dast-mode` | | `baseline` | `baseline`, `api`, `full` | DAST scan depth profile |
+| `--annotations` | | `true` | `true`, `false` | Emit inline GitHub Actions PR annotations |
+| `--sbom` | | `false` | `true`, `false` | Generate Software Bill of Materials (SBOM) |
+| `--sbom-format` | | `cyclonedx-json` | `cyclonedx-json`, `spdx-json` | Format for SBOM export |
+| `--sbom-output` | | `sbom.cdx.json` | File Path | Output destination for SBOM file |
+| `--ai-remediation` | | `false` | `true`, `false` | Generate AI-powered code fix patches |
+| `--ai-provider` | | `gemini` | `gemini`, `openai`, `custom` | AI Remediation LLM provider |
+| `--ai-api-key` | | `""` | String | API key for AI provider |
+| `--patches-dir` | | `patches` | Directory Path | Directory for generated `.patch` files |
+| `--plugins-dir` | | `.aegisci/plugins` | Directory Path | Directory for custom scanner plugins |
+| `--dashboard-url` | | `""` | Webhook URL | Enterprise dashboard telemetry endpoint |
+| `--dashboard-token` | | `""` | String | Bearer authentication token for dashboard |
+| `--verbose` | `-v` | `false` | `true`, `false` | Enable verbose terminal output |
 
 ---
 
-## 11. Troubleshooting & FAQ
+## 12. Troubleshooting & FAQ
 
 ### Q: Why did the SARIF upload step fail in GitHub Actions?
 **A:** Ensure your GitHub workflow job contains the permission `security-events: write`. Without this permission, GitHub will reject the SARIF upload.
@@ -408,7 +457,7 @@ permissions:
 **A:** AegisCI gracefully checks for binary availability. Missing local tools are reported with a yellow notice `[!] NOT INSTALLED in PATH`, allowing other available engines to run uninterrupted. In GitHub Actions and Docker containers, all engines are pre-packaged.
 
 ### Q: Can I run DAST against a service running inside Docker?
-**A:** Yes! Start your service in the previous workflow step (e.g. `docker compose up -d`), then provide `dast-target-url: "http://localhost:8080"`. AegisCI will probe the endpoint health before launching OWASP ZAP.
+**A:** Yes! Start your service in the previous workflow step (e.g. `docker compose up -d`), then provide `--dast-target-url="http://localhost:8080"`. AegisCI will probe the endpoint health before launching OWASP ZAP.
 
 ---
 

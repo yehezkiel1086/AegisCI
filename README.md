@@ -1,12 +1,46 @@
 # 🛡️ AegisCI
 
-> **All-in-One DevSecOps Scanner, Policy-as-Code Engine & Enterprise Security Orchestrator for GitHub Actions.**  
-> Consolidate SAST, DAST, Secrets Detection, SCA, IaC Auditing, CI Workflow Linters, and AI Remediation into a single Go-powered orchestrator with native GitHub Security Tab integration.
+> **All-in-One DevSecOps Scanner, Policy-as-Code Engine & Enterprise Security Orchestrator for GitHub Actions and Standalone Terminals.**  
+> Consolidate SAST, DAST, Secrets Detection, SCA, IaC Auditing, CI Workflow Linters, and AI Remediation into a single Go-powered binary with native GitHub Security Tab integration.
 
 [![GitHub Release](https://img.shields.io/github/v/release/yehezkiel1086/AegisCI?style=flat-square&color=blue)](https://github.com/yehezkiel1086/AegisCI/releases)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](LICENSE)
 [![GitHub Marketplace](https://img.shields.io/badge/Marketplace-AegisCI-purple?style=flat-square&logo=github)](https://github.com/marketplace/actions/aegisci)
 [![Documentation: How to Use](https://img.shields.io/badge/Docs-How%20to%20Use-brightgreen.svg?style=flat-square)](docs/USAGE.md)
+
+---
+
+## 📥 Installation
+
+`aegisci` is cross-compiled as a single standalone terminal binary for **Linux (x86_64/ARM64)**, **macOS (Apple Silicon/Intel)**, and **Windows**.
+
+### macOS & Linux (via Homebrew)
+```bash
+brew tap yehezkiel1086/tap
+brew install aegisci
+```
+
+### Debian / Ubuntu (`.deb`)
+```bash
+curl -sLO https://github.com/yehezkiel1086/AegisCI/releases/latest/download/aegisci_linux_amd64.deb
+sudo dpkg -i aegisci_linux_amd64.deb
+```
+
+### Fedora / RHEL / CentOS (`.rpm`)
+```bash
+sudo rpm -ivh https://github.com/yehezkiel1086/AegisCI/releases/latest/download/aegisci_linux_amd64.rpm
+```
+
+### Go Developers (`go install`)
+```bash
+go install github.com/yehezkiel1086/AegisCI/cmd/aegisci@latest
+```
+
+### Direct Binary Download
+Download pre-built standalone binaries from the [Releases Page](https://github.com/yehezkiel1086/AegisCI/releases):
+- **Linux (x86_64 / ARM64):** `aegisci_<version>_linux_amd64.tar.gz`
+- **macOS (Apple Silicon / Intel):** `aegisci_<version>_darwin_arm64.tar.gz`
+- **Windows (x86_64):** `aegisci_<version>_windows_amd64.zip`
 
 ---
 
@@ -102,6 +136,27 @@ jobs:
 
 ---
 
+## 💻 CLI Terminal Usage
+
+```bash
+# Basic scan against current directory
+aegisci scan --target .
+
+# Run fast PR-Check mode
+aegisci scan --target . --mode pr-check
+
+# Run deep scan with SBOM and AI Remediation
+aegisci scan --target . --mode deep-scan --sbom --ai-remediation --ai-provider gemini --ai-api-key $GEMINI_API_KEY
+
+# Run DAST against staging endpoint
+aegisci scan --dast --dast-target-url https://staging.example.com --fail-on CRITICAL
+
+# Inspect version and build metadata
+aegisci version
+```
+
+---
+
 ## 📄 Policy-as-Code (`.aegisci.yml`)
 
 Fine-tune rules, bypass false positives with expiration dates, and set license compliance policies by adding `.aegisci.yml` to your repository root:
@@ -137,27 +192,6 @@ dast:
   exclude_paths:
     - "/logout"
     - "/admin/reset-db"
-```
-
----
-
-## 💻 Local CLI Usage
-
-```bash
-# Build the binary
-go build -o bin/aegisci ./cmd/aegisci
-
-# Run default audit
-./bin/aegisci --target .
-
-# Run fast PR-Check mode
-./bin/aegisci --target . --mode pr-check
-
-# Run deep scan with SBOM and AI Remediation
-./bin/aegisci --target . --mode deep-scan --sbom --ai-remediation --ai-provider gemini --ai-api-key $GEMINI_API_KEY
-
-# Run DAST against staging endpoint
-./bin/aegisci --target . --dast --dast-target-url https://staging.example.com
 ```
 
 ---
