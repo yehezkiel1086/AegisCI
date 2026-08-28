@@ -88,6 +88,13 @@ brews:
     test: |
       system "#{bin}/aegisci version"
 
+release:
+  github:
+    owner: yehezkiel1086
+    name: AegisCI
+  replace_existing_artifacts: true
+  replace_existing_draft: true
+
 changelog:
   sort: asc
   filters:
