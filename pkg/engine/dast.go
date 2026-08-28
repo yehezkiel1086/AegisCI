@@ -17,7 +17,6 @@ import (
 	"github.com/owenrumney/go-sarif/v2/sarif"
 )
 
-// ZAPAlert represents an individual alert from OWASP ZAP's JSON report.
 type ZAPAlert struct {
 	PluginID    string `json:"pluginId"`
 	Alert       string `json:"alert"`
@@ -33,7 +32,6 @@ type ZAPAlert struct {
 	WASCID      string `json:"wascid"`
 }
 
-// ZAPReport represents the JSON output format of OWASP ZAP baseline / api scans.
 type ZAPReport struct {
 	Site []struct {
 		Name   string     `json:"@name"`
@@ -44,19 +42,16 @@ type ZAPReport struct {
 	} `json:"site"`
 }
 
-// ZAPScanner implements the Scanner interface for OWASP ZAP DAST testing.
 type ZAPScanner struct {
 	BinaryPath   string
 	TargetURL    string
-	Mode         string // "baseline", "api", "full"
+	Mode         string
 	ExcludePaths []string
 	CustomArgs   []string
 	HTTPClient   *http.Client
 }
 
-// NewZAPScanner creates a new OWASP ZAP DAST scanner.
 func NewZAPScanner(targetURL, mode string) *ZAPScanner {
-	// Look for zap-baseline.py, zap-api-scan.py, or docker
 	path := ""
 	if p, err := exec.LookPath("zap-baseline.py"); err == nil {
 		path = p
@@ -67,7 +62,7 @@ func NewZAPScanner(targetURL, mode string) *ZAPScanner {
 	}
 
 	tr := &http.Transport{
-		TLSClientConfig: &tls.Config{InsecureSkipVerify: true}, // Allow local staging self-signed certs
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 	}
 
 	return &ZAPScanner{
@@ -81,22 +76,18 @@ func NewZAPScanner(targetURL, mode string) *ZAPScanner {
 	}
 }
 
-// Name returns the scanner engine name.
 func (z *ZAPScanner) Name() string {
 	return "OWASP ZAP"
 }
 
-// Category returns the security pillar category.
 func (z *ZAPScanner) Category() string {
 	return "DAST & Runtime Security"
 }
 
-// IsAvailable checks whether the ZAP executable exists and a target URL is configured.
 func (z *ZAPScanner) IsAvailable() bool {
 	return z.BinaryPath != "" && z.TargetURL != ""
 }
 
-// ProbeTarget performs an HTTP health check to ensure the target URL is reachable before scanning.
 func (z *ZAPScanner) ProbeTarget(ctx context.Context, targetURL string) error {
 	u, err := url.Parse(targetURL)
 	if err != nil || u.Scheme == "" || u.Host == "" {
@@ -122,19 +113,17 @@ func (z *ZAPScanner) ProbeTarget(ctx context.Context, targetURL string) error {
 	return nil
 }
 
-// Scan executes the OWASP ZAP scan against the target URL and returns a SARIF report.
 func (z *ZAPScanner) Scan(ctx context.Context, targetDir string) (*sarif.Report, error) {
 	if z.TargetURL == "" {
 		return nil, fmt.Errorf("DAST target URL is required")
 	}
 
-	// 1. Health check probe
 	if err := z.ProbeTarget(ctx, z.TargetURL); err != nil {
 		return nil, fmt.Errorf("DAST endpoint health check failed: %w", err)
 	}
 
 	if !z.IsAvailable() {
-		return nil, fmt.Errorf("OWASP ZAP runner (zap-baseline.py) not found in PATH")
+		return nil, fmt.Errorf("OWASP ZAP runner not found in PATH")
 	}
 
 	tmpDir, err := os.MkdirTemp("", "zap-dast-*")
@@ -148,10 +137,9 @@ func (z *ZAPScanner) Scan(ctx context.Context, targetDir string) (*sarif.Report,
 	args := []string{
 		"-t", z.TargetURL,
 		"-J", filepath.Base(jsonReportPath),
-		"-I", // Do not fail exit code on alerts
+		"-I",
 	}
 
-	// Add excluded paths
 	for _, ep := range z.ExcludePaths {
 		args = append(args, "-x", ep)
 	}
@@ -167,7 +155,6 @@ func (z *ZAPScanner) Scan(ctx context.Context, targetDir string) (*sarif.Report,
 
 	_ = cmd.Run()
 
-	// Parse generated JSON report into SARIF
 	if _, err := os.Stat(jsonReportPath); os.IsNotExist(err) {
 		report, _ := sarif.New(sarif.Version210)
 		run := sarif.NewRunWithInformationURI("OWASP ZAP", "https://www.zaproxy.org")
@@ -183,7 +170,6 @@ func (z *ZAPScanner) Scan(ctx context.Context, targetDir string) (*sarif.Report,
 	return ConvertZAPJSONToSARIF(data)
 }
 
-// ConvertZAPJSONToSARIF translates OWASP ZAP's native JSON output into standard SARIF v2.1.0 format.
 func ConvertZAPJSONToSARIF(data []byte) (*sarif.Report, error) {
 	report, err := sarif.New(sarif.Version210)
 	if err != nil {
@@ -206,7 +192,6 @@ func ConvertZAPJSONToSARIF(data []byte) (*sarif.Report, error) {
 			}
 
 			level := "warning"
-			// Risk codes: 3 = High, 2 = Medium, 1 = Low, 0 = Informational
 			switch {
 			case strings.HasPrefix(alert.RiskDesc, "High") || alert.RiskCode == "3":
 				level = "error"

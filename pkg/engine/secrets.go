@@ -11,13 +11,11 @@ import (
 	"github.com/owenrumney/go-sarif/v2/sarif"
 )
 
-// GitleaksScanner implements the Scanner interface for Gitleaks secret detection.
 type GitleaksScanner struct {
 	BinaryPath string
 	CustomArgs []string
 }
 
-// NewGitleaksScanner creates a new Gitleaks scanner.
 func NewGitleaksScanner() *GitleaksScanner {
 	path, _ := exec.LookPath("gitleaks")
 	return &GitleaksScanner{
@@ -25,22 +23,18 @@ func NewGitleaksScanner() *GitleaksScanner {
 	}
 }
 
-// Name returns the name of the scanner.
 func (g *GitleaksScanner) Name() string {
 	return "Gitleaks"
 }
 
-// Category returns the security pillar category.
 func (g *GitleaksScanner) Category() string {
 	return "Secrets Detection"
 }
 
-// IsAvailable checks whether the gitleaks executable exists.
 func (g *GitleaksScanner) IsAvailable() bool {
 	return g.BinaryPath != ""
 }
 
-// Scan executes gitleaks against the target directory and returns a SARIF report.
 func (g *GitleaksScanner) Scan(ctx context.Context, targetDir string) (*sarif.Report, error) {
 	if !g.IsAvailable() {
 		return nil, fmt.Errorf("gitleaks binary not found in PATH")
@@ -54,14 +48,13 @@ func (g *GitleaksScanner) Scan(ctx context.Context, targetDir string) (*sarif.Re
 	tmpFile.Close()
 	defer os.Remove(tmpFilePath)
 
-	// Build arguments
 	args := []string{
 		"detect",
 		"--source", targetDir,
 		"--report-format", "sarif",
 		"--report-path", tmpFilePath,
 		"--no-banner",
-		"--exit-code", "0", // Always return 0 so we can parse findings from SARIF
+		"--exit-code", "0",
 	}
 
 	if len(g.CustomArgs) > 0 {
@@ -76,9 +69,7 @@ func (g *GitleaksScanner) Scan(ctx context.Context, targetDir string) (*sarif.Re
 		return nil, fmt.Errorf("gitleaks execution failed: %w (stderr: %s)", err, stderr.String())
 	}
 
-	// Read generated SARIF report
 	if _, err := os.Stat(tmpFilePath); os.IsNotExist(err) {
-		// No report was written, return empty report
 		report, _ := sarif.New(sarif.Version210)
 		run := sarif.NewRunWithInformationURI("gitleaks", "https://github.com/gitleaks/gitleaks")
 		report.AddRun(run)
@@ -102,7 +93,6 @@ func (g *GitleaksScanner) Scan(ctx context.Context, targetDir string) (*sarif.Re
 		return nil, fmt.Errorf("failed to parse gitleaks SARIF report: %w", err)
 	}
 
-	// Standardize relative paths if needed
 	absTarget, _ := filepath.Abs(targetDir)
 	for _, run := range report.Runs {
 		for _, res := range run.Results {

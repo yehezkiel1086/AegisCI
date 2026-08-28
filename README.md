@@ -1,18 +1,18 @@
-# 🛡️ AegisCI
+# AegisCI
 
-> **All-in-One DevSecOps Scanner, Policy-as-Code Engine & Enterprise Security Orchestrator for GitHub Actions and Standalone Terminals.**  
-> Consolidate SAST, DAST, Secrets Detection, SCA, IaC Auditing, CI Workflow Linters, and AI Remediation into a single Go-powered binary with native GitHub Security Tab integration.
+> All-in-One DevSecOps Scanner, Policy-as-Code Engine & Enterprise Security Orchestrator for GitHub Actions and Standalone Terminals.  
+> Consolidates SAST, DAST, Secrets Detection, SCA, IaC Auditing, CI Workflow Linters, and AI Remediation into a single Go binary with native GitHub Security Tab integration.
 
 [![GitHub Release](https://img.shields.io/github/v/release/yehezkiel1086/AegisCI?style=flat-square&color=blue)](https://github.com/yehezkiel1086/AegisCI/releases)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](LICENSE)
 [![GitHub Marketplace](https://img.shields.io/badge/Marketplace-AegisCI-purple?style=flat-square&logo=github)](https://github.com/marketplace/actions/aegisci)
-[![Documentation: How to Use](https://img.shields.io/badge/Docs-How%20to%20Use-brightgreen.svg?style=flat-square)](docs/USAGE.md)
+[![Documentation: How to Use](https://img.shields.io/badge/Docs-How%20to%20Use-blue.svg?style=flat-square)](docs/USAGE.md)
 
 ---
 
-## 📥 Installation
+## Installation
 
-`aegisci` is cross-compiled as a single standalone terminal binary for **Linux (x86_64/ARM64)**, **macOS (Apple Silicon/Intel)**, and **Windows**.
+`aegisci` is cross-compiled as a single standalone terminal binary for Linux (x86_64/ARM64), macOS (Apple Silicon/Intel), and Windows.
 
 ### macOS & Linux (via Homebrew)
 ```bash
@@ -20,61 +20,59 @@ brew tap yehezkiel1086/tap
 brew install aegisci
 ```
 
-### Debian / Ubuntu (`.deb`)
+### Debian / Ubuntu (.deb)
 ```bash
 curl -sLO https://github.com/yehezkiel1086/AegisCI/releases/latest/download/aegisci_linux_amd64.deb
 sudo dpkg -i aegisci_linux_amd64.deb
 ```
 
-### Fedora / RHEL / CentOS (`.rpm`)
+### Fedora / RHEL / CentOS (.rpm)
 ```bash
 sudo rpm -ivh https://github.com/yehezkiel1086/AegisCI/releases/latest/download/aegisci_linux_amd64.rpm
 ```
 
-### Go Developers (`go install`)
+### Go Developers (go install)
 ```bash
 go install github.com/yehezkiel1086/AegisCI/cmd/aegisci@latest
 ```
 
 ### Direct Binary Download
 Download pre-built standalone binaries from the [Releases Page](https://github.com/yehezkiel1086/AegisCI/releases):
-- **Linux (x86_64 / ARM64):** `aegisci_<version>_linux_amd64.tar.gz`
-- **macOS (Apple Silicon / Intel):** `aegisci_<version>_darwin_arm64.tar.gz`
-- **Windows (x86_64):** `aegisci_<version>_windows_amd64.zip`
+- Linux (x86_64 / ARM64): `aegisci_<version>_linux_amd64.tar.gz`
+- macOS (Apple Silicon / Intel): `aegisci_<version>_darwin_arm64.tar.gz`
+- Windows (x86_64): `aegisci_<version>_windows_amd64.zip`
 
 ---
 
-## 🚀 Why AegisCI?
+## Overview
 
-Security tool sprawl hurts CI/CD pipeline performance and creates alert fatigue. Maintaining separate actions for static analysis, secret checking, dependency auditing, container scanning, dynamic API testing, and workflow linting produces fragmented reports across disparate dashboards.
-
-**AegisCI** provides a single Go-powered orchestrator for your entire DevSecOps pipeline:
-1. **Multi-Engine Concurrency**: Runs **Semgrep**, **Gitleaks**, **Trivy**, **Checkov**, **Zizmor**, **OWASP ZAP**, and **Custom Plugins** concurrently in parallel goroutines.
-2. **Unified SARIF v2.1.0**: Deduplicates and aggregates all findings into a single SARIF document rendered directly in **Security → Code scanning alerts**.
-3. **Inline PR Annotations**: Emits native GitHub Workflow Commands to display security issues directly on Pull Request code diffs.
-4. **Smart Pipeline Modes**: Dynamically routes execution between fast **`pr-check`** (< 3 mins) and comprehensive **`deep-scan`**.
-5. **Policy-as-Code (`.aegisci.yml`)**: Manage suppressions with expiration dates, glob matching, tolerance limits, and license compliance rules.
-6. **AI Remediation Engine (v4.0)**: Automatically generates unified Git diff patch files (`.patch`) for detected vulnerabilities using LLMs.
-7. **Enterprise Extensibility (v4.0)**: Supports custom WASM/executable plugins and centralized dashboard telemetry streaming.
+AegisCI provides a single Go-powered orchestrator for your entire DevSecOps pipeline:
+1. Multi-Engine Concurrency: Runs Semgrep, Gitleaks, Trivy, Checkov, Zizmor, OWASP ZAP, and custom plugins concurrently in parallel goroutines.
+2. Unified SARIF v2.1.0: Deduplicates and aggregates all findings into a single SARIF document rendered directly in Security → Code scanning alerts.
+3. Inline PR Annotations: Emits native GitHub Workflow Commands to display security issues directly on pull request code diffs.
+4. Smart Pipeline Modes: Dynamically routes execution between fast `pr-check` (< 3 mins) and comprehensive `deep-scan`.
+5. Policy-as-Code (`.aegisci.yml`): Manage suppressions with expiration dates, glob matching, tolerance limits, and license compliance rules.
+6. AI Remediation Engine: Automatically generates unified Git diff patch files (`.patch`) for detected vulnerabilities using LLMs.
+7. Enterprise Extensibility: Supports custom WASM/executable plugins and centralized dashboard telemetry streaming.
 
 ---
 
-## 📊 Security Pillars
+## Security Pillars
 
-| Security Pillar | Engine | What It Secures |
+| Security Pillar | Engine | Description |
 | :--- | :--- | :--- |
-| **Secrets Detection** | **Gitleaks** | Leaked API tokens, private keys, database credentials, AWS keys |
-| **SAST** | **Semgrep** | Source code vulnerabilities, SQL injections, XSS, insecure crypto |
-| **SCA & SBOM** | **Trivy** | Vulnerable open-source packages across 15+ lockfiles; CycloneDX/SPDX SBOMs |
-| **IaC & Containers** | **Checkov** | Misconfigured Terraform (`.tf`), Dockerfiles, Kubernetes manifests, Helm |
-| **DAST** | **OWASP ZAP** | Web app & API runtime vulnerabilities with automated URL health check |
-| **CI Meta-Security** | **Zizmor** | Unpinned GitHub Actions (`@v4`), script injection risks in `.github/workflows/` |
-| **AI Remediation** | **LLM Engine** | Automated code fix patch generation (`patches/*.patch`) |
-| **Custom Plugins** | **Plugin SDK** | Custom corporate compliance rules (WASM, Python, Bash, Go) |
+| Secrets Detection | Gitleaks | Leaked API tokens, private keys, database credentials, AWS keys |
+| SAST | Semgrep | Source code vulnerabilities, SQL injections, XSS, insecure crypto |
+| SCA & SBOM | Trivy | Vulnerable open-source packages across lockfiles; CycloneDX/SPDX SBOMs |
+| IaC & Containers | Checkov | Misconfigured Terraform (.tf), Dockerfiles, Kubernetes manifests, Helm |
+| DAST | OWASP ZAP | Web app & API runtime vulnerabilities with automated URL health check |
+| CI Meta-Security | Zizmor | Unpinned GitHub Actions (@v4), script injection risks in workflows |
+| AI Remediation | LLM Engine | Automated code fix patch generation (patches/*.patch) |
+| Custom Plugins | Plugin SDK | Custom corporate compliance rules (WASM, Python, Bash, Go) |
 
 ---
 
-## ⚡ Quickstart
+## Quickstart
 
 Add AegisCI to `.github/workflows/security.yml` in your repository:
 
@@ -93,8 +91,8 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      security-events: write # Required for GitHub Code Scanning Tab upload
-      pull-requests: write   # For inline PR annotations
+      security-events: write
+      pull-requests: write
 
     steps:
       - name: Checkout Code
@@ -105,14 +103,14 @@ jobs:
       - name: Run AegisCI Security Suite
         uses: yehezkiel1086/AegisCI@v1
         with:
-          mode: 'auto'              # 'pr-check' on PRs, 'deep-scan' on merge
-          fail-on-severity: 'CRITICAL'  # Blocks build on CRITICAL findings
-          sbom: 'true'              # Exports CycloneDX SBOM
+          mode: 'auto'
+          fail-on-severity: 'HIGH'
+          sbom: 'true'
 ```
 
 ---
 
-## 📦 Architecture & Orchestration Flow
+## Architecture & Flow
 
 ```
 ┌────────────────────────────────────────────────────────────────────────┐
@@ -136,47 +134,26 @@ jobs:
 
 ---
 
-## 💻 CLI Terminal Usage
+## Policy-as-Code (`.aegisci.yml`)
 
-```bash
-# Basic scan against current directory
-aegisci scan --target .
-
-# Run fast PR-Check mode
-aegisci scan --target . --mode pr-check
-
-# Run deep scan with SBOM and AI Remediation
-aegisci scan --target . --mode deep-scan --sbom --ai-remediation --ai-provider gemini --ai-api-key $GEMINI_API_KEY
-
-# Run DAST against staging endpoint
-aegisci scan --dast --dast-target-url https://staging.example.com --fail-on CRITICAL
-
-# Inspect version and build metadata
-aegisci version
-```
-
----
-
-## 📄 Policy-as-Code (`.aegisci.yml`)
-
-Fine-tune rules, bypass false positives with expiration dates, and set license compliance policies by adding `.aegisci.yml` to your repository root:
+Configure exemptions and tolerance limits by adding `.aegisci.yml` to your repository root:
 
 ```yaml
 version: "4.0"
 
 settings:
-  fail_on_unpatched_cves: false # Don't block builds if no vendor fix exists
-  max_critical: 0               # Zero tolerance for critical vulnerabilities
-  max_high: 2                   # Allow up to 2 high findings before failing
+  fail_on_unpatched_cves: false
+  max_critical: 0
+  max_high: 2
 
 ignore:
   - id: "G401"
     path: "pkg/legacy/hash.go"
     reason: "Non-cryptographic hash used for caching"
-    expires: "2026-12-31"       # Exception automatically expires after date
+    expires: "2026-12-31"
 
   - id: "generic-api-key"
-    path: "test/fixtures/**"    # Recursive glob matching
+    path: "test/fixtures/**"
     reason: "Synthetic test fixture with dummy token"
 
 license_policy:
@@ -196,24 +173,34 @@ dast:
 
 ---
 
-## 📚 Detailed Documentation
+## CLI Usage
+
+```bash
+# basic scan against current directory
+aegisci scan --target .
+
+# fast PR-check mode
+aegisci scan --target . --mode pr-check
+
+# deep scan with SBOM and AI Remediation
+aegisci scan --target . --mode deep-scan --sbom --ai-remediation --ai-provider gemini --ai-api-key $GEMINI_API_KEY
+
+# run DAST against staging endpoint
+aegisci scan --dast --dast-target-url https://staging.example.com --fail-on CRITICAL
+
+# inspect version and build metadata
+aegisci version
+```
+
+---
+
+## Documentation
 
 For full guides, detailed configuration options, CLI reference, and recipe workflows, please see:
-👉 **[Complete How-To-Use Guide (`docs/USAGE.md`)](docs/USAGE.md)**
+[Complete Guide (`docs/USAGE.md`)](docs/USAGE.md)
 
 ---
 
-## 🤝 Contributing
+## License
 
-Contributions are warmly welcome!
-1. Fork the project repository.
-2. Create your feature branch (`git checkout -b feat/custom-engine`).
-3. Commit your changes (`git commit -m 'feat: add custom engine'`).
-4. Run tests: `go test -v -race ./...`
-5. Push to your branch and open a Pull Request.
-
----
-
-## 📜 License
-
-Distributed under the **MIT License**. See [`LICENSE`](LICENSE) for details.
+Distributed under the MIT License. See [`LICENSE`](LICENSE) for details.

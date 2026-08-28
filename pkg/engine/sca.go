@@ -11,13 +11,11 @@ import (
 	"github.com/owenrumney/go-sarif/v2/sarif"
 )
 
-// TrivyScanner implements the Scanner and SBOMGenerator interfaces for SCA & SBOM.
 type TrivyScanner struct {
 	BinaryPath string
 	CustomArgs []string
 }
 
-// NewTrivyScanner creates a new Trivy SCA scanner.
 func NewTrivyScanner() *TrivyScanner {
 	path, _ := exec.LookPath("trivy")
 	return &TrivyScanner{
@@ -25,22 +23,18 @@ func NewTrivyScanner() *TrivyScanner {
 	}
 }
 
-// Name returns the scanner engine name.
 func (t *TrivyScanner) Name() string {
 	return "Trivy"
 }
 
-// Category returns the security pillar category.
 func (t *TrivyScanner) Category() string {
 	return "SCA & Supply Chain"
 }
 
-// IsAvailable checks whether the trivy executable exists in PATH.
 func (t *TrivyScanner) IsAvailable() bool {
 	return t.BinaryPath != ""
 }
 
-// Scan executes Trivy filesystem vulnerability analysis and returns a SARIF report.
 func (t *TrivyScanner) Scan(ctx context.Context, targetDir string) (*sarif.Report, error) {
 	if !t.IsAvailable() {
 		return nil, fmt.Errorf("trivy binary not found in PATH")
@@ -88,7 +82,6 @@ func (t *TrivyScanner) Scan(ctx context.Context, targetDir string) (*sarif.Repor
 		return nil, fmt.Errorf("failed to parse trivy SARIF report: %w", err)
 	}
 
-	// Normalize relative artifact locations
 	absTarget, _ := filepath.Abs(targetDir)
 	for _, run := range report.Runs {
 		for _, res := range run.Results {
@@ -107,13 +100,12 @@ func (t *TrivyScanner) Scan(ctx context.Context, targetDir string) (*sarif.Repor
 	return report, nil
 }
 
-// GenerateSBOM generates a CycloneDX or SPDX Software Bill of Materials using Trivy.
 func (t *TrivyScanner) GenerateSBOM(ctx context.Context, targetDir, format, outputPath string) error {
 	if !t.IsAvailable() {
 		return fmt.Errorf("trivy binary not found in PATH")
 	}
 
-	// Map format argument to Trivy format flags
+	// map format argument to trivy format flags
 	trivyFormat := "cyclonedx"
 	if format == "spdx-json" || format == "spdx" {
 		trivyFormat = "spdx-json"
@@ -121,7 +113,6 @@ func (t *TrivyScanner) GenerateSBOM(ctx context.Context, targetDir, format, outp
 		trivyFormat = "cyclonedx"
 	}
 
-	// Ensure output directory exists
 	if dir := filepath.Dir(outputPath); dir != "" && dir != "." {
 		if err := os.MkdirAll(dir, 0755); err != nil {
 			return fmt.Errorf("failed to create directory for SBOM output: %w", err)

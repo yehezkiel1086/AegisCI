@@ -10,12 +10,10 @@ import (
 	"github.com/yehezkiel1086/AegisCI/pkg/config"
 )
 
-// Emitter formats security findings as GitHub Actions workflow command annotations.
 type Emitter struct {
 	writer io.Writer
 }
 
-// NewEmitter creates a new annotation emitter writing to the specified writer.
 func NewEmitter(w io.Writer) *Emitter {
 	if w == nil {
 		w = os.Stdout
@@ -23,7 +21,6 @@ func NewEmitter(w io.Writer) *Emitter {
 	return &Emitter{writer: w}
 }
 
-// Emit outputs GitHub Actions inline annotations for all findings in the summary.
 func (e *Emitter) Emit(summary *aggregator.Summary) {
 	if summary == nil || len(summary.Findings) == 0 {
 		return
@@ -54,7 +51,6 @@ func (e *Emitter) Emit(summary *aggregator.Summary) {
 	}
 }
 
-// escapeData escapes special characters in GitHub Workflow Command message bodies.
 func escapeData(s string) string {
 	s = strings.ReplaceAll(s, "%", "%25")
 	s = strings.ReplaceAll(s, "\r", "%0D")
@@ -62,7 +58,6 @@ func escapeData(s string) string {
 	return s
 }
 
-// escapeProperty escapes special characters in GitHub Workflow Command property attributes.
 func escapeProperty(s string) string {
 	s = strings.ReplaceAll(s, "%", "%25")
 	s = strings.ReplaceAll(s, "\r", "%0D")

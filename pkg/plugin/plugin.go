@@ -13,7 +13,6 @@ import (
 	"github.com/yehezkiel1086/AegisCI/pkg/engine"
 )
 
-// Plugin defines the standard interface for custom AegisCI compliance and scanner plugins.
 type Plugin interface {
 	Name() string
 	Version() string
@@ -21,7 +20,6 @@ type Plugin interface {
 	Execute(ctx context.Context, targetDir string) (*sarif.Report, error)
 }
 
-// ExecutablePlugin represents an external script or binary plugin.
 type ExecutablePlugin struct {
 	BinaryPath string
 	PluginName string
@@ -29,7 +27,6 @@ type ExecutablePlugin struct {
 	Cat        string
 }
 
-// Name returns the name of the executable plugin.
 func (e *ExecutablePlugin) Name() string {
 	if e.PluginName != "" {
 		return e.PluginName
@@ -38,7 +35,6 @@ func (e *ExecutablePlugin) Name() string {
 	return strings.TrimSuffix(base, filepath.Ext(base))
 }
 
-// Version returns the plugin version.
 func (e *ExecutablePlugin) Version() string {
 	if e.Ver != "" {
 		return e.Ver
@@ -46,7 +42,6 @@ func (e *ExecutablePlugin) Version() string {
 	return "1.0.0"
 }
 
-// Category returns the security pillar category.
 func (e *ExecutablePlugin) Category() string {
 	if e.Cat != "" {
 		return e.Cat
@@ -54,7 +49,6 @@ func (e *ExecutablePlugin) Category() string {
 	return "Custom Plugin"
 }
 
-// Execute runs the plugin executable against the target directory and parses the SARIF output.
 func (e *ExecutablePlugin) Execute(ctx context.Context, targetDir string) (*sarif.Report, error) {
 	tmpFile, err := os.CreateTemp("", "plugin-sarif-*.json")
 	if err != nil {
@@ -77,7 +71,6 @@ func (e *ExecutablePlugin) Execute(ctx context.Context, targetDir string) (*sari
 
 	_ = cmd.Run()
 
-	// Try reading from tmpPath first, or from stdout as fallback
 	var data []byte
 	if fileInfo, statErr := os.Stat(tmpPath); statErr == nil && fileInfo.Size() > 0 {
 		data, _ = os.ReadFile(tmpPath)
@@ -98,12 +91,10 @@ func (e *ExecutablePlugin) Execute(ctx context.Context, targetDir string) (*sari
 	return report, nil
 }
 
-// Adapter converts any Plugin into an engine.Scanner for seamless orchestrator execution.
 type Adapter struct {
 	plugin Plugin
 }
 
-// AsScanner wraps a Plugin as an engine.Scanner.
 func AsScanner(p Plugin) engine.Scanner {
 	return &Adapter{plugin: p}
 }
@@ -117,12 +108,11 @@ func (a *Adapter) Scan(ctx context.Context, targetDir string) (*sarif.Report, er
 	return a.plugin.Execute(ctx, targetDir)
 }
 
-// DiscoverPlugins scans a directory for executable plugins.
 func DiscoverPlugins(pluginsDir string) ([]Plugin, error) {
 	var plugins []Plugin
 
 	if _, err := os.Stat(pluginsDir); os.IsNotExist(err) {
-		return plugins, nil // Directory not existing is not an error
+		return plugins, nil
 	}
 
 	entries, err := os.ReadDir(pluginsDir)
@@ -138,7 +128,6 @@ func DiscoverPlugins(pluginsDir string) ([]Plugin, error) {
 		fullPath := filepath.Join(pluginsDir, entry.Name())
 		name := strings.TrimSuffix(entry.Name(), filepath.Ext(entry.Name()))
 
-		// Check if executable or standard script format
 		ext := strings.ToLower(filepath.Ext(entry.Name()))
 		if ext == ".sh" || ext == ".py" || ext == ".exe" || ext == ".bin" || ext == ".wasm" || ext == "" {
 			plugins = append(plugins, &ExecutablePlugin{

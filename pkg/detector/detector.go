@@ -6,7 +6,6 @@ import (
 	"strings"
 )
 
-// StackInfo contains detected languages, frameworks, and infrastructure types.
 type StackInfo struct {
 	Languages      []string `json:"languages"`
 	Frameworks     []string `json:"frameworks"`
@@ -15,7 +14,6 @@ type StackInfo struct {
 	HasWorkflows   bool     `json:"has_workflows"`
 }
 
-// Detect inspects targetDir and returns detected technologies and repository indicators.
 func Detect(targetDir string) (*StackInfo, error) {
 	info := &StackInfo{
 		Languages:      make([]string, 0),
@@ -23,12 +21,10 @@ func Detect(targetDir string) (*StackInfo, error) {
 		Infrastructure: make([]string, 0),
 	}
 
-	// Check git presence
 	if _, err := os.Stat(filepath.Join(targetDir, ".git")); err == nil {
 		info.HasGitRepo = true
 	}
 
-	// Check workflow presence
 	if _, err := os.Stat(filepath.Join(targetDir, ".github", "workflows")); err == nil {
 		info.HasWorkflows = true
 	}
@@ -42,7 +38,6 @@ func Detect(targetDir string) (*StackInfo, error) {
 		}
 
 		relPath, _ := filepath.Rel(targetDir, path)
-		// Skip hidden dirs like .git and heavy node_modules/vendor
 		if fileInfo.IsDir() {
 			base := fileInfo.Name()
 			if (strings.HasPrefix(base, ".") && base != ".") || base == "node_modules" || base == "vendor" {
@@ -54,7 +49,6 @@ func Detect(targetDir string) (*StackInfo, error) {
 		name := strings.ToLower(fileInfo.Name())
 		ext := strings.ToLower(filepath.Ext(fileInfo.Name()))
 
-		// Language indicators
 		switch {
 		case name == "go.mod" || ext == ".go":
 			langSet["Go"] = true
@@ -76,7 +70,6 @@ func Detect(targetDir string) (*StackInfo, error) {
 			langSet["C/C++"] = true
 		}
 
-		// Infrastructure indicators
 		switch {
 		case name == "dockerfile" || name == "containerfile" || strings.HasPrefix(name, "docker-compose"):
 			infraSet["Docker/Containers"] = true

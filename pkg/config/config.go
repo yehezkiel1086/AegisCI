@@ -5,7 +5,6 @@ import (
 	"strings"
 )
 
-// Severity levels
 const (
 	SeverityNone     = "NONE"
 	SeverityLow      = "LOW"
@@ -14,34 +13,29 @@ const (
 	SeverityCritical = "CRITICAL"
 )
 
-// Mode types
 const (
 	ModeAuto     = "auto"
 	ModePRCheck  = "pr-check"
 	ModeDeepScan = "deep-scan"
 )
 
-// SBOM Formats
 const (
 	SBOMFormatCycloneDX = "cyclonedx-json"
 	SBOMFormatSPDX      = "spdx-json"
 )
 
-// DAST Modes
 const (
 	DASTModeBaseline = "baseline"
 	DASTModeAPI      = "api"
 	DASTModeFull     = "full"
 )
 
-// AI Providers
 const (
 	AIProviderGemini = "gemini"
 	AIProviderOpenAI = "openai"
 	AIProviderCustom = "custom"
 )
 
-// Config holds runtime configuration options for the AegisCI orchestrator.
 type Config struct {
 	TargetDir           string `yaml:"target_dir"`
 	OutputFile          string `yaml:"output_file"`
@@ -62,7 +56,6 @@ type Config struct {
 	GenerateSBOM        bool   `yaml:"sbom"`
 	SBOMFormat          string `yaml:"sbom_format"`
 	SBOMOutput          string `yaml:"sbom_output"`
-	// v4.0 Enterprise Extensions
 	EnableAIRemediation bool   `yaml:"ai_remediation"`
 	AIProvider          string `yaml:"ai_provider"`
 	AIAPIKey            string `yaml:"ai_api_key"`
@@ -77,7 +70,6 @@ type Config struct {
 	Verbose             bool   `yaml:"verbose"`
 }
 
-// DefaultConfig returns default configuration values for v4.0.
 func DefaultConfig() *Config {
 	return &Config{
 		TargetDir:           ".",
@@ -99,7 +91,6 @@ func DefaultConfig() *Config {
 		GenerateSBOM:        false,
 		SBOMFormat:          SBOMFormatCycloneDX,
 		SBOMOutput:          "sbom.cdx.json",
-		// v4.0 Defaults
 		EnableAIRemediation: false,
 		AIProvider:          AIProviderGemini,
 		AIAPIKey:            "",
@@ -115,7 +106,6 @@ func DefaultConfig() *Config {
 	}
 }
 
-// NormalizeSeverity standardizes severity strings to uppercase and validates them.
 func NormalizeSeverity(sev string) (string, error) {
 	upper := strings.ToUpper(strings.TrimSpace(sev))
 	switch upper {
@@ -134,7 +124,6 @@ func NormalizeSeverity(sev string) (string, error) {
 	}
 }
 
-// SeverityRank converts a severity level string into an integer rank for comparison.
 func SeverityRank(sev string) int {
 	norm, err := NormalizeSeverity(sev)
 	if err != nil {
@@ -154,7 +143,6 @@ func SeverityRank(sev string) int {
 	}
 }
 
-// MapSARIFLevelToSeverity converts SARIF result levels ("error", "warning", "note", "none") to AegisCI severity strings.
 func MapSARIFLevelToSeverity(level string) string {
 	switch strings.ToLower(level) {
 	case "error":

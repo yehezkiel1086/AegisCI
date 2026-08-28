@@ -37,13 +37,13 @@ var scanCmd = &cobra.Command{
 	Short: "Execute full-spectrum security audit across code, dependencies, IaC, and runtime",
 	Long: `Execute parallel security scans across all configured engines (SAST, Secrets, SCA, IaC, DAST, CI Workflows, Custom Plugins).
 Outputs a unified SARIF v2.1.0 report, emits PR annotations, and evaluates Policy-as-Code quality gates.`,
-	Example: `  # Basic scan on current directory
+	Example: `  # basic scan on current directory
   aegisci scan --target .
 
-  # Fast PR check mode
+  # fast PR check mode
   aegisci scan --target . --mode pr-check
 
-  # Deep scan with SBOM and AI Remediation
+  # deep scan with SBOM and AI Remediation
   aegisci scan --target . --mode deep-scan --sbom --ai-remediation --ai-api-key $GEMINI_API_KEY
 
   # DAST scan targeting staging endpoint
@@ -56,7 +56,6 @@ Outputs a unified SARIF v2.1.0 report, emits PR annotations, and evaluates Polic
 func init() {
 	flags := scanCmd.Flags()
 
-	// Primary operational flags
 	flags.StringVarP(&scanCfg.TargetDir, "target", "t", scanCfg.TargetDir, "Target directory or repository root to scan")
 	flags.StringVarP(&scanCfg.OutputFile, "output", "o", scanCfg.OutputFile, "Output SARIF report destination")
 	flags.StringVarP(&scanCfg.Mode, "mode", "m", scanCfg.Mode, "Pipeline mode: auto, pr-check, deep-scan")
@@ -65,7 +64,6 @@ func init() {
 	flags.StringVarP(&scanCfg.PolicyFile, "config", "c", scanCfg.PolicyFile, "Path to .aegisci.yml policy configuration file")
 	flags.StringVar(&scanCfg.PolicyFile, "policy-file", scanCfg.PolicyFile, "Alias for --config")
 
-	// Security engine toggles
 	flags.BoolVar(&scanCfg.EnableSAST, "sast", scanCfg.EnableSAST, "Enable Static Application Security Testing (Semgrep)")
 	flags.BoolVar(&scanCfg.EnableSecrets, "secrets", scanCfg.EnableSecrets, "Enable Secret Detection (Gitleaks)")
 	flags.BoolVar(&scanCfg.EnableSCA, "sca", scanCfg.EnableSCA, "Enable Software Composition Analysis (Trivy)")
@@ -75,13 +73,11 @@ func init() {
 	flags.StringVar(&scanCfg.DASTTargetURL, "dast-target-url", scanCfg.DASTTargetURL, "Target web endpoint URL for DAST scanning")
 	flags.StringVar(&scanCfg.DASTMode, "dast-mode", scanCfg.DASTMode, "DAST scan mode: baseline, api, full")
 
-	// Integrations and output formatters
 	flags.BoolVar(&scanCfg.EnableAnnotations, "annotations", scanCfg.EnableAnnotations, "Emit inline GitHub Actions PR annotations (::error/::warning)")
 	flags.BoolVar(&scanCfg.GenerateSBOM, "sbom", scanCfg.GenerateSBOM, "Generate Software Bill of Materials (SBOM)")
 	flags.StringVar(&scanCfg.SBOMFormat, "sbom-format", scanCfg.SBOMFormat, "SBOM format: cyclonedx-json, spdx-json")
 	flags.StringVar(&scanCfg.SBOMOutput, "sbom-output", scanCfg.SBOMOutput, "Output path for SBOM artifact")
 
-	// Enterprise v4.0 flags
 	flags.BoolVar(&scanCfg.EnableAIRemediation, "ai-remediation", scanCfg.EnableAIRemediation, "Generate AI-powered code fix patches (.patch)")
 	flags.StringVar(&scanCfg.AIProvider, "ai-provider", scanCfg.AIProvider, "AI Provider for remediation: gemini, openai, custom")
 	flags.StringVar(&scanCfg.AIAPIKey, "ai-api-key", scanCfg.AIAPIKey, "API key for AI Remediation provider")
@@ -92,7 +88,6 @@ func init() {
 	flags.StringVar(&scanCfg.DashboardURL, "dashboard-url", scanCfg.DashboardURL, "Centralized Enterprise Dashboard webhook URL")
 	flags.StringVar(&scanCfg.DashboardToken, "dashboard-token", scanCfg.DashboardToken, "Authentication token for Dashboard webhook")
 
-	// Vortex Threat Intelligence
 	flags.BoolVar(&scanCfg.EnableVortex, "vortex", scanCfg.EnableVortex, "Enable Vortex Threat Intelligence feed checks")
 	flags.StringVar(&scanCfg.VortexAPIURL, "vortex-api-url", scanCfg.VortexAPIURL, "Vortex Threat Intelligence API base URL")
 	flags.StringVar(&scanCfg.VortexAPIKey, "vortex-api-key", scanCfg.VortexAPIKey, "Vortex API authentication token")
@@ -103,30 +98,30 @@ func init() {
 func runScan(cfg *config.Config) error {
 	printBanner()
 
-	// Normalize and validate fail-on-severity
+	// normalize severity input
 	normSev, err := config.NormalizeSeverity(cfg.FailOnSeverity)
 	if err != nil {
 		return err
 	}
 	cfg.FailOnSeverity = normSev
 
-	// Handle graceful termination
+	// graceful interrupt handling
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
 	startTime := time.Now()
 
-	// 1. Resolve Execution Mode & Pipeline Strategy
+	// resolve mode and scanner routing
 	plan := router.ResolvePlan(cfg)
-	whiteBold.Printf("⚡ [1/7] Smart Mode Routing (Mode: %s)\n", color.CyanString(plan.EffectiveMode))
+	whiteBold.Printf("[1/7] Mode Routing (mode: %s)\n", color.CyanString(plan.EffectiveMode))
 	gray.Printf("  • %s\n", plan.Reason)
 	fmt.Println()
 
-	// 2. Stack Detection
-	whiteBold.Println("🔍 [2/7] Inspecting Repository Stack...")
+	// detect repository technology stack
+	whiteBold.Println("[2/7] Inspecting Repository Stack...")
 	stack, err := detector.Detect(cfg.TargetDir)
 	if err != nil {
-		gray.Printf("  Warning: could not inspect stack: %v\n", err)
+		gray.Printf("  warning: could not inspect stack: %v\n", err)
 	} else {
 		if len(stack.Languages) > 0 {
 			fmt.Printf("  • Languages:      %s\n", color.GreenString(strings.Join(stack.Languages, ", ")))
@@ -142,8 +137,8 @@ func runScan(cfg *config.Config) error {
 	}
 	fmt.Println()
 
-	// 3. Scanner Orchestration & Plugin Discovery
-	whiteBold.Println("🛠️  [3/7] Initializing Security Engines & Enterprise Plugins...")
+	// initialize configured scanner engines
+	whiteBold.Println("[3/7] Initializing Security Engines...")
 	var activeScanners []engine.Scanner
 	var engineNames []string
 	var sbomEngine *engine.TrivyScanner
@@ -151,9 +146,9 @@ func runScan(cfg *config.Config) error {
 	if plan.EnableSecrets {
 		gitleaks := engine.NewGitleaksScanner()
 		if gitleaks.IsAvailable() {
-			greenBold.Printf("  [✓] Gitleaks (Secrets Detection)      -> READY\n")
+			greenBold.Printf("  [READY] Gitleaks (Secrets Detection)\n")
 		} else {
-			yellowBold.Printf("  [!] Gitleaks (Secrets Detection)      -> NOT INSTALLED in PATH\n")
+			yellowBold.Printf("  [MISSING] Gitleaks (Secrets Detection)\n")
 		}
 		activeScanners = append(activeScanners, gitleaks)
 		engineNames = append(engineNames, gitleaks.Name())
@@ -162,9 +157,9 @@ func runScan(cfg *config.Config) error {
 	if plan.EnableSAST {
 		semgrep := engine.NewSemgrepScanner()
 		if semgrep.IsAvailable() {
-			greenBold.Printf("  [✓] Semgrep  (SAST Static Code)       -> READY\n")
+			greenBold.Printf("  [READY] Semgrep  (SAST Static Code)\n")
 		} else {
-			yellowBold.Printf("  [!] Semgrep  (SAST Static Code)       -> NOT INSTALLED in PATH\n")
+			yellowBold.Printf("  [MISSING] Semgrep  (SAST Static Code)\n")
 		}
 		activeScanners = append(activeScanners, semgrep)
 		engineNames = append(engineNames, semgrep.Name())
@@ -174,9 +169,9 @@ func runScan(cfg *config.Config) error {
 		trivy := engine.NewTrivyScanner()
 		sbomEngine = trivy
 		if trivy.IsAvailable() {
-			greenBold.Printf("  [✓] Trivy    (SCA & Dependencies)     -> READY\n")
+			greenBold.Printf("  [READY] Trivy    (SCA & Dependencies)\n")
 		} else {
-			yellowBold.Printf("  [!] Trivy    (SCA & Dependencies)     -> NOT INSTALLED in PATH\n")
+			yellowBold.Printf("  [MISSING] Trivy    (SCA & Dependencies)\n")
 		}
 		activeScanners = append(activeScanners, trivy)
 		engineNames = append(engineNames, trivy.Name())
@@ -185,9 +180,9 @@ func runScan(cfg *config.Config) error {
 	if plan.EnableIaC {
 		checkov := engine.NewCheckovScanner()
 		if checkov.IsAvailable() {
-			greenBold.Printf("  [✓] Checkov  (IaC & Containers)       -> READY\n")
+			greenBold.Printf("  [READY] Checkov  (IaC & Containers)\n")
 		} else {
-			yellowBold.Printf("  [!] Checkov  (IaC & Containers)       -> NOT INSTALLED in PATH\n")
+			yellowBold.Printf("  [MISSING] Checkov  (IaC & Containers)\n")
 		}
 		activeScanners = append(activeScanners, checkov)
 		engineNames = append(engineNames, checkov.Name())
@@ -196,9 +191,9 @@ func runScan(cfg *config.Config) error {
 	if plan.EnableWorkflowAudit && stack.HasWorkflows {
 		zizmor := engine.NewZizmorScanner()
 		if zizmor.IsAvailable() {
-			greenBold.Printf("  [✓] Zizmor   (CI Workflow Hardening)  -> READY\n")
+			greenBold.Printf("  [READY] Zizmor   (CI Workflow Hardening)\n")
 		} else {
-			yellowBold.Printf("  [!] Zizmor   (CI Workflow Hardening)  -> NOT INSTALLED in PATH\n")
+			yellowBold.Printf("  [MISSING] Zizmor   (CI Workflow Hardening)\n")
 		}
 		activeScanners = append(activeScanners, zizmor)
 		engineNames = append(engineNames, zizmor.Name())
@@ -207,19 +202,19 @@ func runScan(cfg *config.Config) error {
 	if plan.EnableDAST && plan.DASTTargetURL != "" {
 		zapScanner := engine.NewZAPScanner(plan.DASTTargetURL, plan.DASTMode)
 		if zapScanner.IsAvailable() {
-			greenBold.Printf("  [✓] OWASP ZAP (DAST Runtime: %s) -> READY\n", plan.DASTTargetURL)
+			greenBold.Printf("  [READY] OWASP ZAP (DAST Runtime: %s)\n", plan.DASTTargetURL)
 		} else {
-			yellowBold.Printf("  [!] OWASP ZAP (DAST Runtime)          -> RUNNER NOT INSTALLED in PATH\n")
+			yellowBold.Printf("  [MISSING] OWASP ZAP (DAST Runtime)\n")
 		}
 		activeScanners = append(activeScanners, zapScanner)
 		engineNames = append(engineNames, zapScanner.Name())
 	}
 
-	// Discover Custom Enterprise Plugins
+	// discover plugins from plugins directory
 	discoveredPlugins, err := plugin.DiscoverPlugins(cfg.PluginsDir)
 	if err == nil && len(discoveredPlugins) > 0 {
 		for _, p := range discoveredPlugins {
-			greenBold.Printf("  [✓] Plugin: %-25s (v%s) -> LOADED\n", p.Name(), p.Version())
+			greenBold.Printf("  [READY] Plugin: %-25s (v%s)\n", p.Name(), p.Version())
 			activeScanners = append(activeScanners, plugin.AsScanner(p))
 			engineNames = append(engineNames, p.Name())
 		}
@@ -230,8 +225,8 @@ func runScan(cfg *config.Config) error {
 	}
 	fmt.Println()
 
-	// 4. Execution
-	whiteBold.Println("🚀 [4/7] Executing Parallel Security Engines & Plugins...")
+	// execute scanners concurrently
+	whiteBold.Println("[4/7] Executing Parallel Security Engines...")
 	orchestrator := engine.NewOrchestrator(activeScanners...)
 	results := orchestrator.Run(ctx, cfg.TargetDir)
 
@@ -242,7 +237,7 @@ func runScan(cfg *config.Config) error {
 
 	for _, res := range results {
 		if res.Error != nil {
-			redBold.Printf("  ✗ %-10s (%-22s): failed (%s) - %v\n", res.ScannerName, res.Category, res.Duration.Round(time.Millisecond), res.Error)
+			redBold.Printf("  [FAIL] %-10s (%-22s): failed (%s) - %v\n", res.ScannerName, res.Category, res.Duration.Round(time.Millisecond), res.Error)
 		} else {
 			findingCount := 0
 			if res.Report != nil {
@@ -251,44 +246,44 @@ func runScan(cfg *config.Config) error {
 				}
 				agg.AddReport(res.Report)
 			}
-			greenBold.Printf("  ✓ %-10s (%-22s): completed in %-6s (findings: %d)\n",
+			greenBold.Printf("  [PASS] %-10s (%-22s): completed in %-6s (findings: %d)\n",
 				res.ScannerName, res.Category, res.Duration.Round(time.Millisecond), findingCount)
 		}
 	}
 
-	// Optional SBOM Generation
+	// generate optional SBOM
 	if plan.GenerateSBOM && sbomEngine != nil && sbomEngine.IsAvailable() {
 		fmt.Println()
-		whiteBold.Printf("📦 Generating Software Bill of Materials (%s)...\n", color.CyanString(cfg.SBOMFormat))
+		whiteBold.Printf("Generating Software Bill of Materials (%s)...\n", color.CyanString(cfg.SBOMFormat))
 		if err := sbomEngine.GenerateSBOM(ctx, cfg.TargetDir, cfg.SBOMFormat, cfg.SBOMOutput); err != nil {
-			redBold.Printf("  ✗ SBOM generation failed: %v\n", err)
+			redBold.Printf("  [FAIL] SBOM generation failed: %v\n", err)
 		} else {
-			greenBold.Printf("  ✓ SBOM artifact successfully saved to: %s\n", color.WhiteString(cfg.SBOMOutput))
+			greenBold.Printf("  [PASS] SBOM artifact saved to: %s\n", color.WhiteString(cfg.SBOMOutput))
 		}
 	}
 
-	// Optional Vortex Threat Intelligence check
+	// optional threat feed query
 	if cfg.EnableVortex {
 		fmt.Println()
-		whiteBold.Println("🌐 [Vortex] Querying Threat Intelligence Feed...")
+		whiteBold.Println("Querying Vortex Threat Feed...")
 		vortexClient := vortex.NewClient(cfg.VortexAPIURL, cfg.VortexAPIKey)
 		if vortexClient.IsConfigured() {
-			greenBold.Printf("  ✓ Connected to Vortex Threat Feed (%s)\n", cfg.VortexAPIURL)
+			greenBold.Printf("  [OK] Connected to Vortex Threat Feed (%s)\n", cfg.VortexAPIURL)
 		} else {
-			yellowBold.Printf("  ! Vortex Client initialized in standby (API key not configured)\n")
+			yellowBold.Printf("  [INFO] Vortex Client in standby (API key not configured)\n")
 		}
 	}
 	fmt.Println()
 
-	// 5. Aggregation, Deduplication & Policy-as-Code Evaluation
-	whiteBold.Println("🛡️  [5/7] Aggregating Findings & Evaluating Policy-as-Code...")
+	// aggregate, deduplicate, and apply policy exceptions
+	whiteBold.Println("[5/7] Aggregating Findings & Evaluating Policy...")
 	agg.Deduplicate()
 
 	pol, polErr := policy.LoadPolicy(cfg.PolicyFile)
 	if polErr != nil {
-		gray.Printf("  Warning: could not load policy file: %v\n", polErr)
+		gray.Printf("  warning: could not load policy file: %v\n", polErr)
 	} else if pol != nil {
-		gray.Printf("  Loaded policy from %s (%d active ignore rules)\n", cfg.PolicyFile, len(pol.Ignore))
+		gray.Printf("  loaded policy from %s (%d active ignore rules)\n", cfg.PolicyFile, len(pol.Ignore))
 		agg.ApplyPolicy(pol)
 	}
 
@@ -298,55 +293,54 @@ func runScan(cfg *config.Config) error {
 	greenBold.Printf("  Unified SARIF report written to: %s\n", color.WhiteString(cfg.OutputFile))
 	fmt.Println()
 
-	// Summary Table
 	summary := agg.ComputeSummary()
 	elapsed := time.Since(startTime)
 	printSummaryTable(summary, elapsed, cfg.FailOnSeverity, plan.EffectiveMode)
 
-	// 6. AI Remediation Engine (v4.0)
+	// generate AI remediation suggestions if enabled
 	if cfg.EnableAIRemediation && len(summary.Findings) > 0 {
 		fmt.Println()
-		whiteBold.Printf("🤖 [6/7] Generating AI Remediation Fixes (%s)...\n", color.CyanString(cfg.AIProvider))
+		whiteBold.Printf("[6/7] Generating AI Remediation Fixes (%s)...\n", color.CyanString(cfg.AIProvider))
 		aiEngine := remediation.NewEngine(cfg.AIProvider, cfg.AIAPIKey, cfg.AIModel, cfg.AIBaseURL)
 		suggestions, err := aiEngine.GenerateRemediations(ctx, summary.Findings, cfg.TargetDir)
 		if err != nil {
-			gray.Printf("  Warning: AI remediation generation encountered an issue: %v\n", err)
+			gray.Printf("  warning: AI remediation encountered an issue: %v\n", err)
 		} else if len(suggestions) > 0 {
 			if err := remediation.SavePatches(suggestions, cfg.PatchesDir); err != nil {
-				redBold.Printf("  ✗ Failed to write patch files: %v\n", err)
+				redBold.Printf("  [FAIL] Failed to write patch files: %v\n", err)
 			} else {
-				greenBold.Printf("  ✓ Generated %d code fix patch(es) in %s/\n", len(suggestions), color.WhiteString(cfg.PatchesDir))
+				greenBold.Printf("  [PASS] Generated %d code fix patch(es) in %s/\n", len(suggestions), color.WhiteString(cfg.PatchesDir))
 			}
 		}
 	}
 
-	// 7. Inline PR Annotations
+	// emit workflow annotations on PRs
 	if cfg.EnableAnnotations && len(summary.Findings) > 0 {
-		whiteBold.Println("\n📝 [7/7] Emitting Inline GitHub PR Annotations...")
+		whiteBold.Println("\n[7/7] Emitting PR Annotations...")
 		emitter := annotations.NewEmitter(os.Stdout)
 		emitter.Emit(summary)
 	}
 
-	// Evaluate Gate
+	// evaluate pipeline gate threshold
 	shouldFail, failReason := agg.EvaluateGate(pol, cfg.FailOnSeverity)
 
-	// Centralized Enterprise Dashboard Telemetry Exporter
+	// dispatch metrics to telemetry endpoint if configured
 	if cfg.DashboardURL != "" {
 		exporterClient := exporter.NewExporter(cfg.DashboardURL, cfg.DashboardToken)
 		payload := exporter.BuildPayload(summary, elapsed, plan.EffectiveMode, cfg.FailOnSeverity, !shouldFail, engineNames)
 		if err := exporterClient.Export(ctx, payload); err != nil {
-			gray.Printf("\n  Warning: could not dispatch telemetry to dashboard: %v\n", err)
+			gray.Printf("\n  warning: could not dispatch telemetry: %v\n", err)
 		} else {
-			greenBold.Printf("\n  ✓ Scan telemetry successfully streamed to enterprise dashboard (%s)\n", cfg.DashboardURL)
+			greenBold.Printf("\n  [PASS] Scan telemetry streamed to dashboard (%s)\n", cfg.DashboardURL)
 		}
 	}
 
 	if shouldFail {
-		redBold.Printf("\n❌ Build Failed: %s\n", failReason)
+		redBold.Printf("\n[FAIL] Quality Gate Failed: %s\n", failReason)
 		os.Exit(1)
 	}
 
-	greenBold.Println("\n✅ Audit Passed: All enterprise policy checks and security gates satisfied.")
+	greenBold.Println("\n[PASS] Quality Gate Passed: All policy checks satisfied.")
 	return nil
 }
 

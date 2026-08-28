@@ -12,7 +12,6 @@ import (
 	"github.com/yehezkiel1086/AegisCI/pkg/policy"
 )
 
-// Summary contains aggregate statistics of scan findings.
 type Summary struct {
 	Total      int            `json:"total"`
 	Critical   int            `json:"critical"`
@@ -25,7 +24,6 @@ type Summary struct {
 	Findings   []Finding      `json:"findings"`
 }
 
-// Finding represents a single unified finding.
 type Finding struct {
 	Engine   string `json:"engine"`
 	RuleID   string `json:"rule_id"`
@@ -35,13 +33,11 @@ type Finding struct {
 	Line     int    `json:"line"`
 }
 
-// Aggregator merges and processes SARIF reports from multiple scanner engines.
 type Aggregator struct {
 	masterReport    *sarif.Report
 	suppressedCount int
 }
 
-// New creates a new Aggregator initialized with an empty SARIF v2.1.0 document.
 func New() (*Aggregator, error) {
 	report, err := sarif.New(sarif.Version210)
 	if err != nil {
@@ -50,12 +46,10 @@ func New() (*Aggregator, error) {
 	return &Aggregator{masterReport: report}, nil
 }
 
-// MasterReport returns the underlying unified SARIF report.
 func (a *Aggregator) MasterReport() *sarif.Report {
 	return a.masterReport
 }
 
-// AddReport appends runs from another SARIF report into the master report.
 func (a *Aggregator) AddReport(subReport *sarif.Report) {
 	if subReport == nil {
 		return
@@ -68,7 +62,6 @@ func (a *Aggregator) AddReport(subReport *sarif.Report) {
 	}
 }
 
-// MergeReportFile reads and parses a SARIF file from disk and merges it.
 func (a *Aggregator) MergeReportFile(filePath string) error {
 	data, err := os.ReadFile(filePath)
 	if err != nil {
@@ -84,7 +77,6 @@ func (a *Aggregator) MergeReportFile(filePath string) error {
 	return nil
 }
 
-// Deduplicate removes duplicate findings across results within each run or across runs.
 func (a *Aggregator) Deduplicate() {
 	seenKeys := make(map[string]bool)
 
@@ -101,7 +93,6 @@ func (a *Aggregator) Deduplicate() {
 	}
 }
 
-// generateResultDeduplicationKey creates a unique string for a SARIF result.
 func generateResultDeduplicationKey(res *sarif.Result) string {
 	ruleID := ""
 	if res.RuleID != nil {
@@ -123,7 +114,6 @@ func generateResultDeduplicationKey(res *sarif.Result) string {
 	return fmt.Sprintf("%s:%s:%d", ruleID, fileURI, startLine)
 }
 
-// ApplyPolicy filters out findings according to policy exceptions / ignore rules.
 func (a *Aggregator) ApplyPolicy(p *policy.Policy) {
 	if p == nil || len(p.Ignore) == 0 {
 		return
@@ -156,7 +146,6 @@ func (a *Aggregator) ApplyPolicy(p *policy.Policy) {
 	}
 }
 
-// ComputeSummary calculates statistics across all runs and findings.
 func (a *Aggregator) ComputeSummary() *Summary {
 	summary := &Summary{
 		Suppressed: a.suppressedCount,
@@ -235,12 +224,11 @@ func (a *Aggregator) ComputeSummary() *Summary {
 	return summary
 }
 
-// EvaluateGate determines whether the build should fail based on severity threshold and policy settings.
 func (a *Aggregator) EvaluateGate(p *policy.Policy, failOnSeverity string) (bool, string) {
 	thresholdRank := config.SeverityRank(failOnSeverity)
 	summary := a.ComputeSummary()
 
-	// 1. Check max tolerances from policy settings if defined
+	// check policy tolerance limits if configured
 	if p != nil {
 		if p.Settings.MaxCritical > 0 && summary.Critical > p.Settings.MaxCritical {
 			return true, fmt.Sprintf("Critical findings (%d) exceeded policy max tolerance of %d", summary.Critical, p.Settings.MaxCritical)
@@ -253,7 +241,7 @@ func (a *Aggregator) EvaluateGate(p *policy.Policy, failOnSeverity string) (bool
 		}
 	}
 
-	// 2. Check general fail-on-severity threshold
+	// evaluate general severity threshold
 	if thresholdRank > 0 {
 		for _, f := range summary.Findings {
 			if config.SeverityRank(f.Severity) >= thresholdRank {
@@ -265,7 +253,6 @@ func (a *Aggregator) EvaluateGate(p *policy.Policy, failOnSeverity string) (bool
 	return false, ""
 }
 
-// sanitizeRulesArray normalizes rules in a tool driver or extension object.
 func sanitizeRulesArray(rules interface{}) []interface{} {
 	rulesList, ok := rules.([]interface{})
 	if !ok {
@@ -284,7 +271,7 @@ func sanitizeRulesArray(rules interface{}) []interface{} {
 			ruleID = idVal
 		}
 
-		// Ensure shortDescription is a valid object with required "text" string
+		// normalize shortDescription to object with required text property
 		if shortDesc, exists := ruleMap["shortDescription"]; exists {
 			switch sd := shortDesc.(type) {
 			case string:
@@ -300,7 +287,7 @@ func sanitizeRulesArray(rules interface{}) []interface{} {
 			ruleMap["shortDescription"] = map[string]interface{}{"text": ruleID}
 		}
 
-		// Ensure fullDescription is valid object or removed
+		// normalize fullDescription to object or omit if empty
 		if fullDesc, exists := ruleMap["fullDescription"]; exists {
 			switch fd := fullDesc.(type) {
 			case string:
@@ -314,7 +301,7 @@ func sanitizeRulesArray(rules interface{}) []interface{} {
 			}
 		}
 
-		// Ensure help is valid object or removed
+		// normalize help to object or omit if empty
 		if help, exists := ruleMap["help"]; exists {
 			switch h := help.(type) {
 			case string:
@@ -334,7 +321,7 @@ func sanitizeRulesArray(rules interface{}) []interface{} {
 	return sanitizedRules
 }
 
-// sanitizeJSONTree walks and sanitizes raw JSON structure to guarantee 100% schema compliance with GitHub Code Scanning.
+// sanitizeJSONTree enforces strict GitHub Code Scanning SARIF v2.1.0 schema compliance
 func sanitizeJSONTree(root map[string]interface{}) {
 	runsVal, ok := root["runs"].([]interface{})
 	if !ok {
@@ -348,13 +335,13 @@ func sanitizeJSONTree(root map[string]interface{}) {
 			continue
 		}
 
-		// 1. results MUST be an array `[]`, NEVER null
+		// ensure results is a JSON array
 		if resVal, exists := runMap["results"]; !exists || resVal == nil {
 			runMap["results"] = []interface{}{}
 		} else if resList, ok := resVal.([]interface{}); ok {
 			for _, res := range resList {
 				if resMap, ok := res.(map[string]interface{}); ok {
-					// Clean up invalid or overflow sentinel ruleIndex values
+					// strip sentinel ruleIndex values that overflow uint
 					if ri, hasRI := resMap["ruleIndex"]; hasRI {
 						if num, isNum := ri.(float64); isNum && (num >= 1000000 || num < 0) {
 							delete(resMap, "ruleIndex")
@@ -364,7 +351,7 @@ func sanitizeJSONTree(root map[string]interface{}) {
 			}
 		}
 
-		// 2. tool driver validation
+		// sanitize driver metadata and rules
 		if toolVal, exists := runMap["tool"].(map[string]interface{}); exists {
 			if driverVal, exists := toolVal["driver"].(map[string]interface{}); exists {
 				if nameVal, ok := driverVal["name"].(string); !ok || nameVal == "" {
@@ -378,7 +365,6 @@ func sanitizeJSONTree(root map[string]interface{}) {
 				toolVal["driver"] = map[string]interface{}{"name": "AegisCI"}
 			}
 
-			// Extensions validation
 			if extVal, exists := toolVal["extensions"].([]interface{}); exists {
 				for _, ext := range extVal {
 					if extMap, ok := ext.(map[string]interface{}); ok {
@@ -392,7 +378,6 @@ func sanitizeJSONTree(root map[string]interface{}) {
 	}
 }
 
-// SaveCombined writes the sanitized merged SARIF report to the target destination.
 func (a *Aggregator) SaveCombined(outputPath string) error {
 	rawBytes, err := json.Marshal(a.masterReport)
 	if err != nil {

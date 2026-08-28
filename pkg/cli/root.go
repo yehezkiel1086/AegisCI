@@ -8,7 +8,7 @@ import (
 )
 
 var (
-	// Build information injected via ldflags during goreleaser build
+	// build metadata injected by goreleaser
 	Version = "dev"
 	Commit  = "none"
 	Date    = "unknown"
@@ -30,13 +30,11 @@ var (
 var rootCmd = &cobra.Command{
 	Use:   "aegisci",
 	Short: "AegisCI - All-in-One DevSecOps Scanner & Security Orchestrator",
-	Long: `AegisCI is a high-performance, multi-engine DevSecOps scanner and security orchestrator.
-It consolidates SAST (Semgrep), DAST (OWASP ZAP), Secrets (Gitleaks), SCA & SBOM (Trivy),
-IaC (Checkov), CI Linters (Zizmor), Custom Plugins, and AI Remediation into a unified SARIF report.`,
+	Long: `AegisCI is a multi-engine DevSecOps scanner and security orchestrator.
+It consolidates SAST, DAST, Secrets, SCA, IaC, CI Linters, Custom Plugins, and AI Remediation into a unified SARIF report.`,
 	SilenceUsage:  true,
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		// Display banner and help if no subcommand is passed
 		printBanner()
 		return cmd.Help()
 	},
@@ -49,7 +47,6 @@ func printBanner() {
 	fmt.Println()
 }
 
-// Execute runs the root CLI command.
 func Execute() error {
 	return rootCmd.Execute()
 }

@@ -9,7 +9,6 @@ import (
 	"time"
 )
 
-// ThreatLevel defines threat risk tiers.
 type ThreatLevel string
 
 const (
@@ -20,22 +19,20 @@ const (
 	ThreatLevelCritical ThreatLevel = "CRITICAL"
 )
 
-// ThreatIntelReport represents threat intelligence information from the Vortex API.
 type ThreatIntelReport struct {
-	Indicator      string      `json:"indicator"`
-	Type           string      `json:"type"` // "package", "ip", "domain", "cve"
-	ThreatLevel    ThreatLevel `json:"threat_level"`
-	Reputation     int         `json:"reputation_score"` // 0-100 (0 = malicious, 100 = safe)
-	Malicious      bool        `json:"malicious"`
-	BreachFlag     bool        `json:"breach_flag"`
-	Advisories     []string    `json:"advisories"`
-	KnownAttacks   []string    `json:"known_attacks"`
-	LastSeenAt     string      `json:"last_seen_at"`
+	Indicator    string      `json:"indicator"`
+	Type         string      `json:"type"`
+	ThreatLevel  ThreatLevel `json:"threat_level"`
+	Reputation   int         `json:"reputation_score"`
+	Malicious    bool        `json:"malicious"`
+	BreachFlag   bool        `json:"breach_flag"`
+	Advisories   []string    `json:"advisories"`
+	KnownAttacks []string    `json:"known_attacks"`
+	LastSeenAt   string      `json:"last_seen_at"`
 }
 
-// PackageRiskReport represents supply chain threat intelligence for a software dependency.
 type PackageRiskReport struct {
-	Ecosystem          string      `json:"ecosystem"` // "npm", "pypi", "golang", etc.
+	Ecosystem          string      `json:"ecosystem"`
 	PackageName        string      `json:"package_name"`
 	Version            string      `json:"version"`
 	ThreatLevel        ThreatLevel `json:"threat_level"`
@@ -45,14 +42,12 @@ type PackageRiskReport struct {
 	Advisories         []string    `json:"advisories"`
 }
 
-// Client provides an interface for interacting with the Vortex Threat Intelligence service.
 type Client struct {
 	BaseURL    string
 	APIKey     string
 	HTTPClient *http.Client
 }
 
-// NewClient creates a new Vortex threat intelligence API client.
 func NewClient(baseURL, apiKey string) *Client {
 	if baseURL == "" {
 		baseURL = "https://api.vortex-threatintel.io/v1"
@@ -66,12 +61,10 @@ func NewClient(baseURL, apiKey string) *Client {
 	}
 }
 
-// IsConfigured returns true if the Vortex API URL and key are provided.
 func (c *Client) IsConfigured() bool {
 	return c.BaseURL != "" && c.APIKey != ""
 }
 
-// QueryPackage queries Vortex for supply chain security intelligence regarding a package.
 func (c *Client) QueryPackage(ctx context.Context, ecosystem, name, version string) (*PackageRiskReport, error) {
 	endpoint := fmt.Sprintf("%s/packages/%s/%s", c.BaseURL, url.PathEscape(ecosystem), url.PathEscape(name))
 	if version != "" {
@@ -115,7 +108,6 @@ func (c *Client) QueryPackage(ctx context.Context, ecosystem, name, version stri
 	return &report, nil
 }
 
-// CheckIndicator checks threat intelligence records for a general indicator (domain, IP, CVE).
 func (c *Client) CheckIndicator(ctx context.Context, indicatorType, value string) (*ThreatIntelReport, error) {
 	endpoint := fmt.Sprintf("%s/indicators/%s/%s", c.BaseURL, url.PathEscape(indicatorType), url.PathEscape(value))
 

@@ -11,14 +11,12 @@ import (
 	"github.com/owenrumney/go-sarif/v2/sarif"
 )
 
-// SemgrepScanner implements the Scanner interface for Semgrep SAST analysis.
 type SemgrepScanner struct {
 	BinaryPath string
 	Ruleset    string
 	CustomArgs []string
 }
 
-// NewSemgrepScanner creates a new Semgrep scanner.
 func NewSemgrepScanner() *SemgrepScanner {
 	path, _ := exec.LookPath("semgrep")
 	return &SemgrepScanner{
@@ -27,22 +25,18 @@ func NewSemgrepScanner() *SemgrepScanner {
 	}
 }
 
-// Name returns the name of the scanner.
 func (s *SemgrepScanner) Name() string {
 	return "Semgrep"
 }
 
-// Category returns the security pillar category.
 func (s *SemgrepScanner) Category() string {
 	return "SAST"
 }
 
-// IsAvailable checks whether the semgrep executable exists.
 func (s *SemgrepScanner) IsAvailable() bool {
 	return s.BinaryPath != ""
 }
 
-// Scan executes semgrep against the target directory and returns a SARIF report.
 func (s *SemgrepScanner) Scan(ctx context.Context, targetDir string) (*sarif.Report, error) {
 	if !s.IsAvailable() {
 		return nil, fmt.Errorf("semgrep binary not found in PATH")
@@ -78,10 +72,9 @@ func (s *SemgrepScanner) Scan(ctx context.Context, targetDir string) (*sarif.Rep
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
 
-	// Execute command. Semgrep returns non-zero exit codes when findings exist.
+	// semgrep returns non-zero exit codes when findings exist
 	_ = cmd.Run()
 
-	// Check if output SARIF was produced
 	fileInfo, statErr := os.Stat(tmpFilePath)
 	if statErr != nil || fileInfo.Size() == 0 {
 		return nil, fmt.Errorf("semgrep did not produce a SARIF output file (stderr: %s)", stderr.String())
@@ -97,7 +90,6 @@ func (s *SemgrepScanner) Scan(ctx context.Context, targetDir string) (*sarif.Rep
 		return nil, fmt.Errorf("failed to parse semgrep SARIF report: %w", err)
 	}
 
-	// Standardize relative paths if needed
 	absTarget, _ := filepath.Abs(targetDir)
 	for _, run := range report.Runs {
 		for _, res := range run.Results {

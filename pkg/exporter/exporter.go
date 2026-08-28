@@ -12,7 +12,6 @@ import (
 	"github.com/yehezkiel1086/AegisCI/pkg/aggregator"
 )
 
-// Payload represents the structured telemetry metrics sent to the enterprise dashboard.
 type Payload struct {
 	Repository    string              `json:"repository"`
 	CommitSHA     string              `json:"commit_sha"`
@@ -28,14 +27,12 @@ type Payload struct {
 	Engines       []string            `json:"active_engines"`
 }
 
-// Exporter manages dispatching scan telemetry and metrics to enterprise endpoints.
 type Exporter struct {
 	EndpointURL string
 	AuthToken   string
 	HTTPClient  *http.Client
 }
 
-// NewExporter creates a new enterprise dashboard telemetry exporter.
 func NewExporter(endpointURL, authToken string) *Exporter {
 	return &Exporter{
 		EndpointURL: endpointURL,
@@ -46,12 +43,10 @@ func NewExporter(endpointURL, authToken string) *Exporter {
 	}
 }
 
-// IsConfigured checks if an enterprise dashboard endpoint is set.
 func (e *Exporter) IsConfigured() bool {
 	return e.EndpointURL != ""
 }
 
-// BuildPayload constructs the telemetry payload from environment variables and scan statistics.
 func BuildPayload(summary *aggregator.Summary, duration time.Duration, mode, failThreshold string, gatePassed bool, engines []string) *Payload {
 	repo := os.Getenv("GITHUB_REPOSITORY")
 	if repo == "" {
@@ -90,7 +85,6 @@ func BuildPayload(summary *aggregator.Summary, duration time.Duration, mode, fai
 	}
 }
 
-// Export sends the telemetry metrics payload to the enterprise dashboard webhook.
 func (e *Exporter) Export(ctx context.Context, payload *Payload) error {
 	if !e.IsConfigured() {
 		return nil

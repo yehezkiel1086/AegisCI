@@ -14,7 +14,6 @@ import (
 	"github.com/yehezkiel1086/AegisCI/pkg/aggregator"
 )
 
-// RemediationSuggestion holds the AI-generated code fix and patch diff for a security finding.
 type RemediationSuggestion struct {
 	RuleID        string `json:"rule_id"`
 	Engine        string `json:"engine"`
@@ -26,7 +25,6 @@ type RemediationSuggestion struct {
 	PatchDiff     string `json:"patch_diff"`
 }
 
-// Engine coordinates AI remediation generation using LLM APIs or heuristic fallback templates.
 type Engine struct {
 	Provider   string
 	APIKey     string
@@ -35,7 +33,6 @@ type Engine struct {
 	HTTPClient *http.Client
 }
 
-// NewEngine creates a new AI Remediation Engine.
 func NewEngine(provider, apiKey, model, baseURL string) *Engine {
 	if model == "" {
 		if provider == "openai" {
@@ -55,11 +52,9 @@ func NewEngine(provider, apiKey, model, baseURL string) *Engine {
 	}
 }
 
-// GenerateRemediations produces AI remediation suggestions for given findings.
 func (e *Engine) GenerateRemediations(ctx context.Context, findings []aggregator.Finding, targetDir string) ([]RemediationSuggestion, error) {
 	var results []RemediationSuggestion
 
-	// Cap remediation to top 10 most severe findings to avoid API rate limits
 	maxToProcess := 10
 	if len(findings) < maxToProcess {
 		maxToProcess = len(findings)
@@ -67,7 +62,6 @@ func (e *Engine) GenerateRemediations(ctx context.Context, findings []aggregator
 
 	for i := 0; i < maxToProcess; i++ {
 		f := findings[i]
-		// Read source code snippet if available
 		codeSnippet := ""
 		fullPath := filepath.Join(targetDir, f.FilePath)
 		if data, err := os.ReadFile(fullPath); err == nil {
@@ -85,7 +79,6 @@ func (e *Engine) GenerateRemediations(ctx context.Context, findings []aggregator
 
 		suggestion, err := e.remediateFinding(ctx, f, codeSnippet)
 		if err != nil {
-			// Fallback to contextual heuristic suggestion if LLM call fails
 			suggestion = generateHeuristicRemediation(f)
 		}
 
@@ -100,7 +93,6 @@ func (e *Engine) remediateFinding(ctx context.Context, f aggregator.Finding, cod
 		return generateHeuristicRemediation(f), nil
 	}
 
-	// Make LLM request (OpenAI-compatible / Custom endpoint)
 	apiURL := e.BaseURL
 	if apiURL == "" {
 		if e.Provider == "openai" {
@@ -205,7 +197,6 @@ func generateHeuristicRemediation(f aggregator.Finding) RemediationSuggestion {
 	}
 }
 
-// SavePatches writes patch files and a markdown remediation summary to outputDir.
 func SavePatches(suggestions []RemediationSuggestion, outputDir string) error {
 	if len(suggestions) == 0 {
 		return nil
@@ -216,7 +207,7 @@ func SavePatches(suggestions []RemediationSuggestion, outputDir string) error {
 	}
 
 	var md bytes.Buffer
-	md.WriteString("# 🛡️ AegisCI AI Remediation Suggestions\n\n")
+	md.WriteString("# AegisCI AI Remediation Suggestions\n\n")
 	md.WriteString("Below are AI-generated remediation patches and guidance for detected vulnerabilities.\n\n")
 
 	for i, s := range suggestions {
